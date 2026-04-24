@@ -73,12 +73,35 @@
   <div class="modal-backdrop" id="modalBackdrop" hidden></div>
   <div class="modal" id="taskModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden>
     <div class="modal__inner" id="modalInner">
-      <h2 class="modal__title" id="modalTitle">할일 목록</h2>
-      <p class="modal__hint" id="modalDateHint"></p>
+      <div class="modal__topbar">
+        <div class="modal__topbar-text">
+          <h2 class="modal__title" id="modalTitle">할일 목록</h2>
+          <p class="modal__hint" id="modalDateHint"></p>
+        </div>
+        <button type="button" class="btn btn--primary modal__btn-new-top" id="btnNewTask">+ 새 할일 추가</button>
+      </div>
 
       <div class="modal__field">
         <label for="taskTitle">제목</label>
         <input type="text" id="taskTitle" name="title" placeholder="일정 제목" />
+      </div>
+      <div class="modal__field modal__quick-meta" id="modalQuickMeta">
+        <div class="modal__quick-meta-row">
+          <span class="modal__quick-meta-label">진행 상태</span>
+          <div class="modal__quick-meta-group" id="quickStatusGroup" role="radiogroup" aria-label="진행 상태">
+            <button type="button" class="modal__quick-btn" data-status="ready">ready</button>
+            <button type="button" class="modal__quick-btn" data-status="on-going">on-going</button>
+            <button type="button" class="modal__quick-btn" data-status="done">done</button>
+          </div>
+        </div>
+        <div class="modal__quick-meta-row">
+          <span class="modal__quick-meta-label">중요도</span>
+          <div class="modal__quick-meta-group" id="quickImportanceGroup" role="radiogroup" aria-label="중요도">
+            <button type="button" class="modal__quick-btn" data-importance="high">상</button>
+            <button type="button" class="modal__quick-btn" data-importance="medium">중</button>
+            <button type="button" class="modal__quick-btn" data-importance="low">하</button>
+          </div>
+        </div>
       </div>
 
       <p class="modal__field-hint modal__field-hint--accent">
@@ -122,7 +145,6 @@
       <div class="modal__tasks" id="existingTasksWrap" hidden>
         <div class="modal__tasks-head">
           <h3 class="modal__subheading">이 날짜에 해당하는 할일</h3>
-          <button type="button" class="btn-text" id="btnNewTask">새 할일 추가</button>
         </div>
         <ul class="task-chip-list" id="existingTasksList"></ul>
       </div>

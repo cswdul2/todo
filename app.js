@@ -47,6 +47,8 @@
   const modalInner = document.getElementById("modalInner");
   const modalDateHint = document.getElementById("modalDateHint");
   const taskTitle = document.getElementById("taskTitle");
+  const quickStatusGroup = document.getElementById("quickStatusGroup");
+  const quickImportanceGroup = document.getElementById("quickImportanceGroup");
   const taskDescription = document.getElementById("taskDescription");
   const taskStart = document.getElementById("taskStart");
   const taskEnd = document.getElementById("taskEnd");
@@ -103,6 +105,9 @@
 
   /** @type {Array<(Omit<Task, 'id'> & { id?: string }) & { confidence?: number }>} */
   let ocrDraftRows = [];
+  /** 새 일정 작성용 임시 상태/중요도 */
+  let draftStatus = "ready";
+  let draftImportance = "medium";
   /** @type {string | null} */
   let ocrPendingBase64 = null;
   /** @type {string} */
@@ -347,11 +352,32 @@
   }
 
   function getCurrentStatus() {
-    return getEditingTask()?.status || "ready";
+    return getEditingTask()?.status || draftStatus;
   }
 
   function getCurrentImportance() {
-    return getEditingTask()?.importance || "medium";
+    return getEditingTask()?.importance || draftImportance;
+  }
+
+  function renderQuickMetaControls() {
+    const status = getCurrentStatus();
+    const imp = getCurrentImportance();
+    if (quickStatusGroup) {
+      const buttons = quickStatusGroup.querySelectorAll("button[data-status]");
+      buttons.forEach((btn) => {
+        const active = btn.getAttribute("data-status") === status;
+        btn.classList.toggle("modal__quick-btn--active", active);
+        btn.setAttribute("aria-checked", active ? "true" : "false");
+      });
+    }
+    if (quickImportanceGroup) {
+      const buttons = quickImportanceGroup.querySelectorAll("button[data-importance]");
+      buttons.forEach((btn) => {
+        const active = btn.getAttribute("data-importance") === imp;
+        btn.classList.toggle("modal__quick-btn--active", active);
+        btn.setAttribute("aria-checked", active ? "true" : "false");
+      });
+    }
   }
 
   function applyModalTheme() {
@@ -646,6 +672,8 @@
   function resetModalFormForNewTaskOnDay() {
     editingId = null;
     modalDefaultWhite = true;
+    draftStatus = "ready";
+    draftImportance = "medium";
     taskTitle.value = "";
     taskDescription.value = "";
     if (selectedDateStr) {
@@ -656,6 +684,7 @@
     taskRecurrenceUntil.value = "";
     toggleRecurrenceFields();
     btnDelete.hidden = true;
+    renderQuickMetaControls();
     applyModalTheme();
   }
 
@@ -965,7 +994,11 @@
 
     if (taskId) {
       const t = tasks.find((x) => x.id === taskId);
-      if (t) fillFormFromTask(t);
+      if (t) {
+        fillFormFromTask(t);
+        draftStatus = t.status || "ready";
+        draftImportance = t.importance || "medium";
+      }
     } else {
       // 해당 날짜에 일정이 있으면 첫 항목을 기본 선택(날짜 변경 즉시 편집 가능)
       const onDay = tasks
@@ -980,7 +1013,11 @@
         editingId = onDay[0].id;
         modalDefaultWhite = false;
         fillFormFromTask(onDay[0]);
+        draftStatus = onDay[0].status || "ready";
+        draftImportance = onDay[0].importance || "medium";
       } else {
+        draftStatus = "ready";
+        draftImportance = "medium";
         taskTitle.value = "";
         taskDescription.value = "";
         taskStart.value = dateStr;
@@ -992,6 +1029,7 @@
 
     toggleRecurrenceFields();
     btnDelete.hidden = !editingId;
+    renderQuickMetaControls();
 
     applyModalTheme();
 
@@ -1047,6 +1085,8 @@
         editingId = t.id;
         modalDefaultWhite = false;
         taskTitle.value = t.title || "";
+        draftStatus = t.status || "ready";
+        draftImportance = t.importance || "medium";
         taskDescription.value = t.description || "";
         taskStart.value = t.startDate;
         taskEnd.value = t.endDate;
@@ -1054,6 +1094,7 @@
         taskRecurrenceUntil.value = t.recurrenceUntil || "";
         toggleRecurrenceFields();
         btnDelete.hidden = false;
+        renderQuickMetaControls();
         applyModalTheme();
         renderExistingTasksList();
       });
@@ -1076,6 +1117,7 @@
           if (editingId === t.id) modalDefaultWhite = false;
           await firebaseUpdateTask(t.id, { status: st });
           renderCalendar();
+          renderQuickMetaControls();
           applyModalTheme();
           renderExistingTasksList();
         });
@@ -1098,6 +1140,7 @@
           tasks[i] = { ...tasks[i], importance: impKey };
           await firebaseUpdateTask(t.id, { importance: impKey });
           renderCalendar();
+          renderQuickMetaControls();
           applyModalTheme();
           renderExistingTasksList();
         });
@@ -1581,6 +1624,43 @@
   taskRecurrence.addEventListener("change", () => {
     toggleRecurrenceFields();
   });
+  if (quickStatusGroup) {
+    quickStatusGroup.addEventListener("click", async (e) => {
+      const btn = e.target instanceof HTMLElement ? e.target.closest("button[data-status]") : null;
+      if (!(btn instanceof HTMLButtonElement)) return;
+      const st = btn.dataset.status || "ready";
+      if (editingId) {
+        const i = tasks.findIndex((x) => x.id === editingId);
+        if (i >= 0) tasks[i] = { ...tasks[i], status: st };
+        await firebaseUpdateTask(editingId, { status: st });
+      } else {
+        draftStatus = st;
+      }
+      modalDefaultWhite = false;
+      renderQuickMetaControls();
+      applyModalTheme();
+      renderCalendar();
+      if (!existingTasksWrap.hidden) renderExistingTasksList();
+    });
+  }
+  if (quickImportanceGroup) {
+    quickImportanceGroup.addEventListener("click", async (e) => {
+      const btn = e.target instanceof HTMLElement ? e.target.closest("button[data-importance]") : null;
+      if (!(btn instanceof HTMLButtonElement)) return;
+      const imp = btn.dataset.importance || "medium";
+      if (editingId) {
+        const i = tasks.findIndex((x) => x.id === editingId);
+        if (i >= 0) tasks[i] = { ...tasks[i], importance: imp };
+        await firebaseUpdateTask(editingId, { importance: imp });
+      } else {
+        draftImportance = imp;
+      }
+      renderQuickMetaControls();
+      applyModalTheme();
+      renderCalendar();
+      if (!existingTasksWrap.hidden) renderExistingTasksList();
+    });
+  }
 
   prevMonth.addEventListener("click", () => {
     viewMonth--;
