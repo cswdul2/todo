@@ -39,21 +39,20 @@ body {
 }
 
 .toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  align-items: stretch;
   gap: 0.75rem;
   margin-bottom: 1rem;
 }
 
 .toolbar__search {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.5rem;
-  flex: 1;
-  min-width: 0;
+  grid-column: 1 / -1;
+  width: 100%;
   min-height: 2.375rem;
 }
 
@@ -74,6 +73,7 @@ body {
 }
 
 .toolbar__select {
+  min-width: 0;
   min-height: 2.375rem;
   padding: 0.4rem 0.5rem;
   border: 1px solid var(--border);
@@ -1721,24 +1721,38 @@ body {
 
 /* ---------- Responsive ---------- */
 @media (max-width: 900px) {
+  body {
+    overflow-x: hidden;
+  }
+
   .app {
     max-width: 100%;
     padding: 1rem 0.7rem 1.2rem;
   }
 
   .toolbar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
     gap: 0.5rem;
+    align-items: stretch;
   }
 
-  .toolbar__search {
+  .toolbar > .toolbar__search {
+    grid-column: 1 / -1;
     width: 100%;
   }
 
   .btn-ocr,
   .btn-today {
+    display: block;
+    width: 100%;
+    min-width: 0;
     min-height: 2.2rem;
     padding: 0.35rem 0.62rem;
     font-size: 0.8rem;
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .month-title {
@@ -1814,16 +1828,8 @@ body {
 }
 
 @media (max-width: 560px) {
-  .toolbar {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.45rem;
-    align-items: stretch;
-  }
-
   .toolbar__search {
-    grid-column: 1 / -1;
-    width: 100%;
+    grid-template-columns: 1fr;
   }
 
   .toolbar__input {
@@ -1831,15 +1837,12 @@ body {
   }
 
   .toolbar__select {
-    flex: 1;
+    width: 100%;
     min-width: 0;
   }
 
   .btn-ocr,
   .btn-today {
-    width: 100%;
-    text-align: center;
-    min-width: 0;
     padding: 0.34rem 0.45rem;
     font-size: 0.76rem;
   }
