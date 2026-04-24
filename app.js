@@ -86,6 +86,18 @@
   const confirmOk = document.getElementById("confirmOk");
 
   const GEMINI_KEY_STORAGE = "calendar-app-gemini-api-key";
+  const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyCflqSWWtIz-h79w4lfBTP3cQNIMwmH01s",
+    authDomain: "todo-8f9cb.firebaseapp.com",
+    databaseURL: "https://todo-8f9cb-default-rtdb.firebaseio.com",
+    projectId: "todo-8f9cb",
+    storageBucket: "todo-8f9cb.firebasestorage.app",
+    messagingSenderId: "1058024138992",
+    appId: "1:1058024138992:web:fcf942bf37c050f5b93a35",
+    measurementId: "G-WLYZYNY1DW",
+  };
+  const FIREBASE_TASKS_PATH = "shared-calendar/tasks";
+  const FIREBASE_META_PATH = "shared-calendar/meta";
   /** 선호 모델 순서 (실제 가용 모델과 교집합으로 선택) */
   const GEMINI_MODEL_PREFER = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
 
@@ -96,6 +108,8 @@
   /** @type {string} */
   let ocrPendingMime = "image/jpeg";
   let geminiKeyCache = "";
+  let firebaseDb = null;
+  let firebaseTasksRef = null;
   /** @type {null | { tasks: Task[], selectedDateStr: string | null, editingId: string | null, modalDefaultWhite: boolean, form: { title: string, description: string, startDate: string, endDate: string, recurrence: 'none'|'daily'|'weekly'|'monthly', recurrenceUntil: string } }} */
   let modalSessionSnapshot = null;
 
@@ -367,13 +381,93 @@
     };
   }
 
+  function toFirebaseTasksMap(list) {
+    /** @type {Record<string, Task>} */
+    const out = {};
+    list.forEach((t) => {
+      if (!t.id) return;
+      out[t.id] = {
+        id: t.id,
+        title: t.title || "",
+        description: t.description || "",
+        status: t.status || "ready",
+        importance: t.importance || "medium",
+        startDate: t.startDate,
+        endDate: t.endDate,
+        recurrence: t.recurrence || "none",
+        recurrenceUntil: t.recurrenceUntil || null,
+      };
+    });
+    return out;
+  }
+
   async function loadTasks() {
-    // 완전 비저장 모드: 항상 빈 상태로 시작
-    tasks = [];
+    if (!window.firebase || !window.firebase.apps) return;
+    const app = window.firebase.apps.length ? window.firebase.app() : window.firebase.initializeApp(FIREBASE_CONFIG);
+    firebaseDb = window.firebase.database(app);
+    firebaseTasksRef = firebaseDb.ref(FIREBASE_TASKS_PATH);
+    const metaRef = firebaseDb.ref(FIREBASE_META_PATH);
+
+    firebaseTasksRef.on(
+      "value",
+      (snap) => {
+        const v = snap.val();
+        const list = v && typeof v === "object" ? Object.values(v) : [];
+        tasks = list.map(normalizeTask);
+        renderCalendar();
+        updateSearchResults();
+        if (!taskModal.hidden) renderExistingTasksList();
+      },
+      (err) => {
+        console.error("Firebase sync error:", err);
+      }
+    );
+
+    // 메타 경로가 없더라도 생성될 수 있도록 no-op write 보장
+    metaRef.update({ connectedAt: new Date().toISOString() }).catch(() => {});
   }
 
   function saveTasks() {
-    // 완전 비저장 모드: 저장 안 함
+    if (!firebaseDb || !firebaseTasksRef) return;
+    const payload = toFirebaseTasksMap(tasks);
+    firebaseTasksRef.set(payload).catch((err) => console.error("Firebase save error:", err));
+    firebaseDb
+      .ref(FIREBASE_META_PATH)
+      .update({ updatedAt: new Date().toISOString() })
+      .catch(() => {});
+  }
+
+  function toFirebaseTask(t) {
+    return {
+      id: t.id,
+      title: t.title || "",
+      description: t.description || "",
+      status: t.status || "ready",
+      importance: t.importance || "medium",
+      startDate: t.startDate,
+      endDate: t.endDate,
+      recurrence: t.recurrence || "none",
+      recurrenceUntil: t.recurrenceUntil || null,
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
+  async function firebaseCreateTask(task) {
+    if (!firebaseDb || !firebaseTasksRef || !task.id) return;
+    await firebaseTasksRef.child(task.id).set({ ...toFirebaseTask(task), createdAt: new Date().toISOString() });
+    await firebaseDb.ref(FIREBASE_META_PATH).update({ updatedAt: new Date().toISOString() });
+  }
+
+  async function firebaseUpdateTask(taskId, patch) {
+    if (!firebaseDb || !firebaseTasksRef || !taskId) return;
+    await firebaseTasksRef.child(taskId).update({ ...patch, updatedAt: new Date().toISOString() });
+    await firebaseDb.ref(FIREBASE_META_PATH).update({ updatedAt: new Date().toISOString() });
+  }
+
+  async function firebaseDeleteTask(taskId) {
+    if (!firebaseDb || !firebaseTasksRef || !taskId) return;
+    await firebaseTasksRef.child(taskId).remove();
+    await firebaseDb.ref(FIREBASE_META_PATH).update({ updatedAt: new Date().toISOString() });
   }
 
   function uuid() {
@@ -973,14 +1067,14 @@
         q.type = "button";
         q.className = "task-chip__quick-btn" + (t.status === st ? " task-chip__quick-btn--active" : "");
         q.textContent = st;
-        q.addEventListener("click", (e) => {
+        q.addEventListener("click", async (e) => {
           e.preventDefault();
           e.stopPropagation();
           const i = tasks.findIndex((x) => x.id === t.id);
           if (i < 0) return;
           tasks[i] = { ...tasks[i], status: st };
           if (editingId === t.id) modalDefaultWhite = false;
-          saveTasks();
+          await firebaseUpdateTask(t.id, { status: st });
           renderCalendar();
           applyModalTheme();
           renderExistingTasksList();
@@ -996,13 +1090,13 @@
         iq.type = "button";
         iq.className = "task-chip__quick-btn" + (t.importance === impKey ? " task-chip__quick-btn--active" : "");
         iq.textContent = impKey === "high" ? "H" : impKey === "low" ? "L" : "M";
-        iq.addEventListener("click", (e) => {
+        iq.addEventListener("click", async (e) => {
           e.preventDefault();
           e.stopPropagation();
           const i = tasks.findIndex((x) => x.id === t.id);
           if (i < 0) return;
           tasks[i] = { ...tasks[i], importance: impKey };
-          saveTasks();
+          await firebaseUpdateTask(t.id, { importance: impKey });
           renderCalendar();
           applyModalTheme();
           renderExistingTasksList();
@@ -1027,7 +1121,7 @@
         if (editingId === t.id) {
           resetModalFormForNewTaskOnDay();
         }
-        saveTasks();
+        await firebaseDeleteTask(t.id);
         renderCalendar();
         renderExistingTasksList();
       });
@@ -1435,15 +1529,14 @@
       const i = tasks.findIndex((x) => x.id === editingId);
       if (i >= 0) {
         tasks[i] = { ...tasks[i], ...payload };
+        await firebaseUpdateTask(editingId, payload);
       }
     } else {
-      tasks.push({
-        id: uuid(),
-        ...payload,
-      });
+      const newTask = { id: uuid(), ...payload };
+      tasks.push(newTask);
+      await firebaseCreateTask(newTask);
     }
 
-    saveTasks();
     renderCalendar();
     closeModal();
   }
@@ -1458,7 +1551,7 @@
     });
     if (!ok) return;
     tasks = tasks.filter((x) => x.id !== editingId);
-    saveTasks();
+    await firebaseDeleteTask(editingId);
     renderCalendar();
     resetModalFormForNewTaskOnDay();
     renderExistingTasksList();
