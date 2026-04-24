@@ -80,6 +80,7 @@
   const btnOcrClose = document.getElementById("btnOcrClose");
   const confirmBackdrop = document.getElementById("confirmBackdrop");
   const confirmPop = document.getElementById("confirmPop");
+  const confirmTitle = document.getElementById("confirmTitle");
   const confirmMessage = document.getElementById("confirmMessage");
   const confirmCancel = document.getElementById("confirmCancel");
   const confirmOk = document.getElementById("confirmOk");
@@ -883,23 +884,40 @@
     const ymd = parseDateStr(dateStr);
     modalDateHint.textContent = `${ymd.getFullYear()}년 ${ymd.getMonth() + 1}월 ${ymd.getDate()}일`;
 
+    const fillFormFromTask = (t) => {
+      taskTitle.value = t.title || "";
+      taskDescription.value = t.description || "";
+      taskStart.value = t.startDate;
+      taskEnd.value = t.endDate;
+      taskRecurrence.value = t.recurrence || "none";
+      taskRecurrenceUntil.value = t.recurrenceUntil || "";
+    };
+
     if (taskId) {
       const t = tasks.find((x) => x.id === taskId);
-      if (t) {
-        taskTitle.value = t.title || "";
-        taskDescription.value = t.description || "";
-        taskStart.value = t.startDate;
-        taskEnd.value = t.endDate;
-        taskRecurrence.value = t.recurrence || "none";
-        taskRecurrenceUntil.value = t.recurrenceUntil || "";
-      }
+      if (t) fillFormFromTask(t);
     } else {
-      taskTitle.value = "";
-      taskDescription.value = "";
-      taskStart.value = dateStr;
-      taskEnd.value = dateStr;
-      taskRecurrence.value = "none";
-      taskRecurrenceUntil.value = "";
+      // 해당 날짜에 일정이 있으면 첫 항목을 기본 선택(날짜 변경 즉시 편집 가능)
+      const onDay = tasks
+        .filter((t) => taskCoversDate(t, dateStr))
+        .sort((a, b) => {
+          const ia = IMP_ORDER[a.importance] ?? 1;
+          const ib = IMP_ORDER[b.importance] ?? 1;
+          if (ia !== ib) return ia - ib;
+          return taskLabel(a).localeCompare(taskLabel(b), "ko");
+        });
+      if (onDay.length > 0) {
+        editingId = onDay[0].id;
+        modalDefaultWhite = false;
+        fillFormFromTask(onDay[0]);
+      } else {
+        taskTitle.value = "";
+        taskDescription.value = "";
+        taskStart.value = dateStr;
+        taskEnd.value = dateStr;
+        taskRecurrence.value = "none";
+        taskRecurrenceUntil.value = "";
+      }
     }
 
     toggleRecurrenceFields();
@@ -1022,7 +1040,12 @@
       del.addEventListener("click", async (e) => {
         e.preventDefault();
         e.stopPropagation();
-        const ok = await openConfirmDialog(`"${taskLabel(t)}" 일정을 삭제할까요?`, "삭제");
+        const ok = await openConfirmDialog(`"${taskLabel(t)}" 일정을 삭제할까요?`, {
+          title: "삭제 확인",
+          okLabel: "삭제",
+          cancelLabel: "취소",
+          showCancel: true,
+        });
         if (!ok) return;
         tasks = tasks.filter((x) => x.id !== t.id);
         if (editingId === t.id) {
@@ -1046,14 +1069,24 @@
     return div.innerHTML;
   }
 
-  function openConfirmDialog(message, okLabel = "삭제") {
+  function openConfirmDialog(message, opts) {
+    const options = {
+      title: "확인",
+      okLabel: "확인",
+      cancelLabel: "취소",
+      showCancel: true,
+      ...opts,
+    };
     return new Promise((resolve) => {
-      if (!confirmBackdrop || !confirmPop || !confirmMessage || !confirmCancel || !confirmOk) {
+      if (!confirmBackdrop || !confirmPop || !confirmMessage || !confirmCancel || !confirmOk || !confirmTitle) {
         resolve(confirm(message));
         return;
       }
+      confirmTitle.textContent = options.title;
       confirmMessage.textContent = message;
-      confirmOk.textContent = okLabel;
+      confirmOk.textContent = options.okLabel;
+      confirmCancel.textContent = options.cancelLabel;
+      confirmCancel.hidden = !options.showCancel;
       confirmBackdrop.hidden = false;
       confirmPop.hidden = false;
 
@@ -1072,10 +1105,20 @@
         cleanup();
         resolve(true);
       };
-      confirmCancel.addEventListener("click", onCancel);
+      if (options.showCancel) {
+        confirmCancel.addEventListener("click", onCancel);
+      }
       confirmOk.addEventListener("click", onOk);
-      confirmBackdrop.addEventListener("click", onCancel);
+      confirmBackdrop.addEventListener("click", options.showCancel ? onCancel : onOk);
       confirmOk.focus();
+    });
+  }
+
+  async function openAlertDialog(message, title = "입력 확인") {
+    await openConfirmDialog(message, {
+      title,
+      okLabel: "확인",
+      showCancel: false,
     });
   }
 
@@ -1368,7 +1411,7 @@
     modalSessionSnapshot = null;
   }
 
-  function saveFromModal() {
+  async function saveFromModal() {
     const title = taskTitle.value.trim();
     const status = getCurrentStatus();
     const description = taskDescription.value.trim();
@@ -1385,21 +1428,21 @@
     }
 
     if (!startDate || !endDate) {
-      alert("시작일과 완료일을 모두 선택해 주세요.");
+      await openAlertDialog("시작일과 완료일을 모두 선택해 주세요.");
       return;
     }
     if (parseDateStr(startDate) > parseDateStr(endDate)) {
-      alert("시작일이 완료일보다 늦을 수 없습니다.");
+      await openAlertDialog("시작일이 완료일보다 늦을 수 없습니다.");
       return;
     }
 
     if (recurrence !== "none") {
       if (!recurrenceUntil) {
-        alert("반복 일정인 경우 반복 종료일을 선택해 주세요.");
+        await openAlertDialog("반복 일정인 경우 반복 종료일을 선택해 주세요.");
         return;
       }
       if (parseDateStr(recurrenceUntil) < parseDateStr(endDate)) {
-        alert("반복 종료일은 첫 일정의 완료일 이후여야 합니다.");
+        await openAlertDialog("반복 종료일은 첫 일정의 완료일 이후여야 합니다.");
         return;
       }
     } else {
@@ -1436,7 +1479,12 @@
 
   async function deleteTask() {
     if (!editingId) return;
-    const ok = await openConfirmDialog("이 일정을 삭제할까요? 반복 일정이면 전체 시리즈가 삭제됩니다.", "삭제");
+    const ok = await openConfirmDialog("이 일정을 삭제할까요? 반복 일정이면 전체 시리즈가 삭제됩니다.", {
+      title: "삭제 확인",
+      okLabel: "삭제",
+      cancelLabel: "취소",
+      showCancel: true,
+    });
     if (!ok) return;
     tasks = tasks.filter((x) => x.id !== editingId);
     saveTasks();
@@ -1455,6 +1503,16 @@
 
   taskStart.addEventListener("change", () => {
     toggleRecurrenceFields();
+    if (taskStart.value && taskEnd.value && parseDateStr(taskStart.value) > parseDateStr(taskEnd.value)) {
+      openAlertDialog("시작일이 완료일보다 늦을 수 없습니다.");
+      taskEnd.value = taskStart.value;
+    }
+  });
+  taskEnd.addEventListener("change", () => {
+    if (taskStart.value && taskEnd.value && parseDateStr(taskStart.value) > parseDateStr(taskEnd.value)) {
+      openAlertDialog("시작일이 완료일보다 늦을 수 없습니다.");
+      taskEnd.value = taskStart.value;
+    }
   });
   taskRecurrence.addEventListener("change", () => {
     toggleRecurrenceFields();
@@ -1478,7 +1536,7 @@
     renderCalendar();
   });
 
-  btnToday.addEventListener("click", goToToday);
+  if (btnToday) btnToday.addEventListener("click", goToToday);
 
   if (btnExport && btnImport && importFileInput) {
     btnExport.addEventListener("click", () => {
@@ -1517,7 +1575,12 @@
           alert("가져오기 파일 형식이 올바르지 않습니다. (tasks 배열 필요)");
           return;
         }
-        const ok = await openConfirmDialog("현재 일정을 가져온 파일로 덮어쓸까요?", "가져오기");
+        const ok = await openConfirmDialog("현재 일정을 가져온 파일로 덮어쓸까요?", {
+          title: "가져오기 확인",
+          okLabel: "가져오기",
+          cancelLabel: "취소",
+          showCancel: true,
+        });
         if (!ok) return;
         tasks = incoming.map(normalizeTask);
         saveTasks();
@@ -1651,7 +1714,8 @@
     if (e.key !== "Escape") return;
     if (confirmPop && !confirmPop.hidden) {
       e.preventDefault();
-      if (confirmCancel) confirmCancel.click();
+      if (confirmCancel && !confirmCancel.hidden) confirmCancel.click();
+      else if (confirmOk) confirmOk.click();
       return;
     }
     if (ocrModal && !ocrModal.hidden) {

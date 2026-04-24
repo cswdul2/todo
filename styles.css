@@ -1718,3 +1718,178 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 900px) {
+  .app {
+    max-width: 100%;
+    padding: 1rem 0.7rem 1.2rem;
+  }
+
+  .toolbar {
+    gap: 0.5rem;
+  }
+
+  .toolbar__search {
+    width: 100%;
+  }
+
+  .btn-ocr,
+  .btn-today {
+    min-height: 2.2rem;
+    padding: 0.35rem 0.62rem;
+    font-size: 0.8rem;
+  }
+
+  .month-title {
+    min-width: 0;
+    font-size: 1.08rem;
+  }
+
+  .nav-btn {
+    width: 2.2rem;
+    height: 2.2rem;
+    font-size: 1.3rem;
+  }
+
+  .calendar-grid {
+    gap: 3px;
+  }
+
+  .calendar-cell {
+    min-height: 74px;
+    padding: 4px;
+    border-radius: 8px;
+  }
+
+  .calendar-cell__num {
+    font-size: 0.82rem;
+  }
+
+  .calendar-cell__holiday-name {
+    font-size: 0.56rem;
+  }
+
+  .calendar-cell__ongoing-count {
+    top: 3px;
+    right: 3px;
+    min-width: 1.05rem;
+    height: 1.05rem;
+    line-height: 1.05rem;
+    font-size: 0.56rem;
+  }
+
+  .dot-legend__panel {
+    padding: 0.55rem 0.6rem 0.65rem;
+  }
+
+  .dot-legend__row {
+    gap: 0.35rem 0.65rem;
+    font-size: 0.69rem;
+  }
+
+  .modal {
+    padding: 0.55rem;
+  }
+
+  .modal__inner {
+    width: 98vw;
+    border-radius: 12px;
+    padding: 1rem 0.9rem 0.95rem;
+  }
+
+  .modal__title {
+    font-size: 1rem;
+  }
+
+  .task-chip {
+    padding: 0.38rem 0.46rem;
+  }
+
+  .task-chip__quick {
+    max-width: min(90vw, 470px);
+    flex-wrap: wrap;
+    right: 0;
+  }
+}
+
+@media (max-width: 560px) {
+  .toolbar__input {
+    min-width: 110px;
+  }
+
+  .toolbar__select {
+    flex: 1;
+    min-width: 100px;
+  }
+
+  .btn-ocr,
+  .btn-today {
+    flex: 1 1 auto;
+    text-align: center;
+  }
+
+  .weekdays {
+    font-size: 0.68rem;
+    margin-bottom: 4px;
+  }
+
+  .calendar-cell {
+    min-height: 62px;
+    padding: 3px;
+  }
+
+  .calendar-cell__num {
+    font-size: 0.75rem;
+  }
+
+  .calendar-cell__holiday-name {
+    display: none;
+  }
+
+  .calendar-cell__dots {
+    gap: 2px;
+  }
+
+  .calendar-cell__dot-wrap--high {
+    width: 11px;
+    height: 11px;
+  }
+
+  .calendar-cell__dot-wrap--medium {
+    width: 9px;
+    height: 9px;
+  }
+
+  .calendar-cell__dot-wrap--low {
+    width: 7px;
+    height: 7px;
+  }
+
+  .calendar-cell__dot-inner {
+    width: 4px;
+    height: 4px;
+  }
+
+  .calendar-cell__dot-wrap--high .calendar-cell__dot-inner {
+    width: 5px;
+    height: 5px;
+  }
+
+  .calendar-cell__dot-wrap--low .calendar-cell__dot-inner {
+    width: 3px;
+    height: 3px;
+  }
+
+  .task-chip__status {
+    display: none;
+  }
+}
+
+/* 터치 디바이스에서는 hover 툴팁 대신 터치 상호작용 유지 */
+@media (hover: none) and (pointer: coarse) {
+  .calendar-cell__dot-wrap[data-tip-body]::before,
+  .calendar-cell__dot-wrap[data-tip-body]::after {
+    display: none !important;
+  }
+}
