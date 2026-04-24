@@ -948,6 +948,18 @@
         wrap.dataset.tipBody = `${taskLabel(t)}`;
         wrap.classList.add(`calendar-cell__dot-wrap--tip-${stKey}`, `calendar-cell__dot-wrap--tip-imp-${impKey}`);
         wrap.tabIndex = 0;
+        // 동그라미 클릭 시 해당 task를 바로 편집 모드로 연다.
+        wrap.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          openModal(dateStr, t.id);
+        });
+        wrap.addEventListener("keydown", (e) => {
+          if (e.key !== "Enter" && e.key !== " ") return;
+          e.preventDefault();
+          e.stopPropagation();
+          openModal(dateStr, t.id);
+        });
         const inner = document.createElement("span");
         inner.className = "calendar-cell__dot-inner " + statusDotClass(t.status);
         if (isTaskOverdueOnDate(t, dateStr)) inner.classList.add("calendar-cell__dot-inner--late");
