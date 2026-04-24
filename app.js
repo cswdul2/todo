@@ -95,6 +95,7 @@
   let ocrPendingBase64 = null;
   /** @type {string} */
   let ocrPendingMime = "image/jpeg";
+  let geminiKeyCache = "";
   /** @type {null | { tasks: Task[], selectedDateStr: string | null, editingId: string | null, modalDefaultWhite: boolean, form: { title: string, description: string, startDate: string, endDate: string, recurrence: 'none'|'daily'|'weekly'|'monthly', recurrenceUntil: string } }} */
   let modalSessionSnapshot = null;
 
@@ -366,38 +367,13 @@
     };
   }
 
-  function loadTasks() {
-    try {
-      let raw = localStorage.getItem(STORAGE_KEY_V2);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          tasks = parsed.map(normalizeTask);
-          return;
-        }
-      }
-      raw = localStorage.getItem(STORAGE_KEY_V1);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          tasks = parsed.map((t) =>
-            normalizeTask({
-              ...t,
-              title: "",
-              recurrence: "none",
-              recurrenceUntil: null,
-            })
-          );
-          saveTasks();
-        }
-      }
-    } catch (_) {
-      tasks = [];
-    }
+  async function loadTasks() {
+    // 완전 비저장 모드: 항상 빈 상태로 시작
+    tasks = [];
   }
 
   function saveTasks() {
-    localStorage.setItem(STORAGE_KEY_V2, JSON.stringify(tasks));
+    // 완전 비저장 모드: 저장 안 함
   }
 
   function uuid() {
@@ -1122,18 +1098,13 @@
     });
   }
 
-  function loadGeminiKey() {
-    try {
-      return localStorage.getItem(GEMINI_KEY_STORAGE) || "";
-    } catch {
-      return "";
-    }
+  async function loadGeminiKey() {
+    // 완전 비저장 모드: 키도 메모리에서만 사용
+    return geminiKeyCache;
   }
 
   function saveGeminiKeyToStorage(k) {
-    try {
-      localStorage.setItem(GEMINI_KEY_STORAGE, (k || "").trim());
-    } catch (_) {}
+    geminiKeyCache = (k || "").trim();
   }
 
   function parseGeminiJsonArray(raw) {
@@ -1367,7 +1338,7 @@
     ocrResults.hidden = true;
     ocrDraftRows = [];
     ocrDraftList.innerHTML = "";
-    geminiApiKeyInput.value = loadGeminiKey();
+    geminiApiKeyInput.value = geminiKeyCache;
     ocrFileInput.value = "";
     ocrPreviewWrap.hidden = true;
     btnOcrRun.disabled = true;
@@ -1733,6 +1704,9 @@
     requestAnimationFrame(renderMultiDayRangeLines);
   });
 
-  loadTasks();
-  renderCalendar();
+  (async () => {
+    await loadGeminiKey();
+    await loadTasks();
+    renderCalendar();
+  })();
 })();
