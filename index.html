@@ -86,20 +86,40 @@
         <input type="text" id="taskTitle" name="title" placeholder="일정 제목" />
       </div>
       <div class="modal__field modal__quick-meta" id="modalQuickMeta">
-        <div class="modal__quick-meta-row">
-          <span class="modal__quick-meta-label">진행 상태</span>
-          <div class="modal__quick-meta-group" id="quickStatusGroup" role="radiogroup" aria-label="진행 상태">
-            <button type="button" class="modal__quick-btn" data-status="ready">ready</button>
-            <button type="button" class="modal__quick-btn" data-status="on-going">on-going</button>
-            <button type="button" class="modal__quick-btn" data-status="done">done</button>
+        <div class="modal__quick-layout">
+          <div class="modal__quick-line modal__quick-line--imp">
+            <span class="modal__quick-meta-label">중요도</span>
+            <div class="modal__quick-meta-group" id="quickImportanceGroup" role="radiogroup" aria-label="중요도">
+              <button type="button" class="modal__quick-btn" data-importance="high">상</button>
+              <button type="button" class="modal__quick-btn" data-importance="medium">중</button>
+              <button type="button" class="modal__quick-btn" data-importance="low">하</button>
+            </div>
           </div>
-        </div>
-        <div class="modal__quick-meta-row">
-          <span class="modal__quick-meta-label">중요도</span>
-          <div class="modal__quick-meta-group" id="quickImportanceGroup" role="radiogroup" aria-label="중요도">
-            <button type="button" class="modal__quick-btn" data-importance="high">상</button>
-            <button type="button" class="modal__quick-btn" data-importance="medium">중</button>
-            <button type="button" class="modal__quick-btn" data-importance="low">하</button>
+          <div class="modal__quick-line modal__quick-line--effort">
+            <label class="modal__quick-meta-label" for="taskEffortValue">투입예상공수</label>
+            <div class="modal__quick-effort">
+              <input type="number" id="taskEffortValue" name="effortValue" min="0" step="0.25" placeholder="예: 24" class="modal__quick-input" />
+              <select id="taskEffortUnit" name="effortUnit" class="modal__quick-input modal__quick-unit">
+                <option value="MH">MH</option>
+                <option value="MD">MD</option>
+              </select>
+            </div>
+          </div>
+          <div class="modal__quick-line modal__quick-line--start">
+            <label class="modal__quick-meta-label" for="taskStart">시작일</label>
+            <input type="date" id="taskStart" name="start" class="modal__quick-input" />
+          </div>
+          <div class="modal__quick-line modal__quick-line--end">
+            <label class="modal__quick-meta-label" for="taskEnd">종료일</label>
+            <input type="date" id="taskEnd" name="end" class="modal__quick-input" />
+          </div>
+          <div class="modal__quick-line modal__quick-line--status">
+            <span class="modal__quick-meta-label">진행상태</span>
+            <div class="modal__quick-meta-group" id="quickStatusGroup" role="radiogroup" aria-label="진행 상태">
+              <button type="button" class="modal__quick-btn" data-status="ready">ready</button>
+              <button type="button" class="modal__quick-btn" data-status="on-going">on-going</button>
+              <button type="button" class="modal__quick-btn" data-status="done">done</button>
+            </div>
           </div>
         </div>
       </div>
@@ -111,17 +131,6 @@
       <div class="modal__field">
         <label for="taskDescription">설명 (description)</label>
         <textarea id="taskDescription" name="description" rows="4" placeholder="자세한 내용을 적어주세요."></textarea>
-      </div>
-
-      <div class="modal__row">
-        <div class="modal__field">
-          <label for="taskStart">시작일</label>
-          <input type="date" id="taskStart" name="start" />
-        </div>
-        <div class="modal__field">
-          <label for="taskEnd">완료일</label>
-          <input type="date" id="taskEnd" name="end" />
-        </div>
       </div>
 
       <div class="modal__section">

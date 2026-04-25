@@ -15,6 +15,8 @@
    * @property {'none'|'daily'|'weekly'|'monthly'} recurrence
    * @property {string | null} recurrenceUntil
    * @property {'high'|'medium'|'low'} importance
+ * @property {number | null} effortValue
+ * @property {'MH'|'MD'} effortUnit
    */
 
   /** @type {Task[]} */
@@ -50,6 +52,8 @@
   const quickStatusGroup = document.getElementById("quickStatusGroup");
   const quickImportanceGroup = document.getElementById("quickImportanceGroup");
   const taskDescription = document.getElementById("taskDescription");
+  const taskEffortValue = document.getElementById("taskEffortValue");
+  const taskEffortUnit = document.getElementById("taskEffortUnit");
   const taskStart = document.getElementById("taskStart");
   const taskEnd = document.getElementById("taskEnd");
   const taskRecurrence = document.getElementById("taskRecurrence");
@@ -115,7 +119,7 @@
   let geminiKeyCache = "";
   let firebaseDb = null;
   let firebaseTasksRef = null;
-  /** @type {null | { tasks: Task[], selectedDateStr: string | null, editingId: string | null, modalDefaultWhite: boolean, form: { title: string, description: string, startDate: string, endDate: string, recurrence: 'none'|'daily'|'weekly'|'monthly', recurrenceUntil: string } }} */
+  /** @type {null | { tasks: Task[], selectedDateStr: string | null, editingId: string | null, modalDefaultWhite: boolean, form: { title: string, description: string, effortValue: string, effortUnit: string, startDate: string, endDate: string, recurrence: 'none'|'daily'|'weekly'|'monthly', recurrenceUntil: string } }} */
   let modalSessionSnapshot = null;
 
   function pad2(n) {
@@ -236,6 +240,31 @@
     return null;
   }
 
+  function diffDaysInclusive(startStr, endStr) {
+    const ms = parseDateStr(endStr).getTime() - parseDateStr(startStr).getTime();
+    return Math.max(1, Math.floor(ms / 86400000) + 1);
+  }
+
+  function taskTotalMh(task) {
+    const raw = Number(task.effortValue);
+    if (!Number.isFinite(raw) || raw <= 0) return 0;
+    return task.effortUnit === "MD" ? raw * 24 : raw;
+  }
+
+  function taskDailyMhOnDate(task, dateStr) {
+    const occ = getOccurrenceContaining(task, dateStr);
+    if (!occ) return 0;
+    const totalMh = taskTotalMh(task);
+    if (!totalMh) return 0;
+    const days = diffDaysInclusive(occ.start, occ.end);
+    return totalMh / days;
+  }
+
+  function formatMh(v) {
+    const n = Math.round(v * 10) / 10;
+    return Number.isInteger(n) ? String(n) : n.toFixed(1);
+  }
+
   function isOverdueOccurrence(endDateStr, status) {
     if (status === "done") return false;
     return startOfDay(parseDateStr(endDateStr)) < todayStart();
@@ -274,6 +303,18 @@
       if (ia !== ib) return ia - ib;
       return taskLabel(a).localeCompare(taskLabel(b), "ko");
     });
+  }
+
+  const MAX_CALENDAR_DOTS = 8;
+
+  /**
+   * 달력 셀 동그라미와 동일한 목록·순서(최대 MAX_CALENDAR_DOTS).
+   * @param {string} dateStr
+   * @returns {Task[]}
+   */
+  function getVisibleTasksForCalendarDay(dateStr) {
+    const list = tasks.filter((t) => taskCoversDate(t, dateStr));
+    return sortTasksForDots(list).slice(0, MAX_CALENDAR_DOTS);
   }
 
   function toDateStrFromYmd(y, m, d) {
@@ -346,7 +387,7 @@
 
   function statusBarColor(status) {
     if (status === "on-going") return "#e8943a";
-    if (status === "done") return "#43a047";
+    if (status === "done") return "repeating-linear-gradient(135deg, #9ca3af 0 3px, #d1d5db 3px 6px)";
     return "#8b95a5";
   }
 
@@ -400,6 +441,8 @@
   }
 
   function normalizeTask(raw) {
+    const effortValueNum = Number(raw.effortValue);
+    const effortValue = Number.isFinite(effortValueNum) && effortValueNum > 0 ? effortValueNum : null;
     return {
       id: raw.id,
       title: raw.title != null ? String(raw.title) : "",
@@ -410,6 +453,8 @@
       recurrence: raw.recurrence === "daily" || raw.recurrence === "weekly" || raw.recurrence === "monthly" ? raw.recurrence : "none",
       recurrenceUntil: raw.recurrenceUntil != null && raw.recurrenceUntil !== "" ? raw.recurrenceUntil : null,
       importance: raw.importance === "high" || raw.importance === "low" ? raw.importance : "medium",
+      effortValue,
+      effortUnit: raw.effortUnit === "MD" ? "MD" : "MH",
     };
   }
 
@@ -428,6 +473,8 @@
         endDate: t.endDate,
         recurrence: t.recurrence || "none",
         recurrenceUntil: t.recurrenceUntil || null,
+        effortValue: Number.isFinite(Number(t.effortValue)) && Number(t.effortValue) > 0 ? Number(t.effortValue) : null,
+        effortUnit: t.effortUnit === "MD" ? "MD" : "MH",
       };
     });
     return out;
@@ -572,7 +619,7 @@
       if (indexMap.has(ds)) dates.push(ds);
       cur.setDate(cur.getDate() + 1);
     }
-    if (dates.length < 2) return [];
+    if (dates.length < 1) return [];
     const segments = [];
     let run = [dates[0]];
     for (let i = 1; i < dates.length; i++) {
@@ -583,11 +630,11 @@
       if (currI === prevI + 1 && currRow === prevRow) {
         run.push(dates[i]);
       } else {
-        if (run.length >= 2) segments.push(run);
+        if (run.length >= 1) segments.push(run);
         run = [dates[i]];
       }
     }
-    if (run.length >= 2) segments.push(run);
+    if (run.length >= 1) segments.push(run);
     return segments;
   }
 
@@ -599,7 +646,7 @@
       case "on-going":
         return "#e8943a";
       case "done":
-        return "#43a047";
+        return "repeating-linear-gradient(135deg, #9ca3af 0 3px, #d1d5db 3px 6px)";
       default:
         return "#8b95a5";
     }
@@ -624,16 +671,19 @@
     /** @type {Map<string, number>} 날짜별 실제 점유 라인 수 */
     const cellLaneMap = new Map();
 
+    const allCells = [...calendarGrid.querySelectorAll(".calendar-cell[data-date-str]")];
+    const cellByDate = new Map(allCells.map((cell) => [cell.dataset.dateStr || "", cell]));
+
+    // 멀티데이 일정은 가로로 이어서 표시
     tasks.forEach((task) => {
       forEachMultiDaySegment(task, (startStr, endStr) => {
         const segments = getSegmentsInGrid(startStr, endStr, calendarGrid);
         segments.forEach((dateRun) => {
           const firstDs = dateRun[0];
           const lastDs = dateRun[dateRun.length - 1];
-          const firstCell = calendarGrid.querySelector(`.calendar-cell[data-date-str="${firstDs}"]`);
-          const lastCell = calendarGrid.querySelector(`.calendar-cell[data-date-str="${lastDs}"]`);
+          const firstCell = cellByDate.get(firstDs);
+          const lastCell = cellByDate.get(lastDs);
           if (!firstCell || !lastCell) return;
-          const allCells = [...calendarGrid.querySelectorAll(".calendar-cell")];
           const idx = allCells.indexOf(firstCell);
           const row = Math.floor(idx / 7);
           let dayUsage = rowDayLaneUsage.get(row);
@@ -641,26 +691,28 @@
             dayUsage = new Map();
             rowDayLaneUsage.set(row, dayUsage);
           }
-          // 이 dateRun 전체에서 충돌하지 않는 가장 낮은 lane을 찾는다.
-          let slot = 0;
+
+          let lane = 0;
           while (true) {
             const occupied = dateRun.some((ds) => {
               const used = dayUsage.get(ds);
-              return !!used && used.has(slot);
+              return !!used && used.has(lane);
             });
             if (!occupied) break;
-            slot += 1;
+            lane += 1;
           }
-          // 선택된 lane을 run에 포함된 모든 날짜에 점유 표시
+
           dateRun.forEach((ds) => {
             let used = dayUsage.get(ds);
             if (!used) {
               used = new Set();
               dayUsage.set(ds, used);
             }
-            used.add(slot);
+            used.add(lane);
+            const prev = cellLaneMap.get(ds) || 0;
+            if (lane + 1 > prev) cellLaneMap.set(ds, lane + 1);
           });
-          rowSlots[row] = Math.max(rowSlots[row] || 0, slot + 1);
+          rowSlots[row] = Math.max(rowSlots[row] || 0, lane + 1);
 
           const r1 = {
             left: firstCell.offsetLeft,
@@ -676,12 +728,14 @@
             width: lastCell.offsetWidth,
             height: lastCell.offsetHeight,
           };
+          const impKey = task.importance === "high" ? "high" : task.importance === "low" ? "low" : "medium";
+          const impToken = "■ ";
+          const stKey = task.status === "on-going" ? "ongoing" : task.status === "done" ? "done" : "ready";
+          const headerTop = Math.max(r1.height * TRACK_TOP_FRAC, HEADER_BASE_PX);
+          const baseTop = Math.round(r1.top + headerTop + HEADER_EXTRA_PX);
           const line = document.createElement("div");
           line.className = "calendar-range-line";
           line.style.background = rangeLineColorForTask(task, endStr);
-          const impKey = task.importance === "high" ? "high" : task.importance === "low" ? "low" : "medium";
-          const impToken = impKey === "high" ? "【H】 " : impKey === "low" ? "【L】 " : "【M】 ";
-          const stKey = task.status === "on-going" ? "ongoing" : task.status === "done" ? "done" : "ready";
           line.dataset.tipToken = impToken;
           line.dataset.tipBody = `${taskLabel(task)}`;
           line.classList.add(`calendar-range-line--tip-${stKey}`, `calendar-range-line--tip-imp-${impKey}`);
@@ -697,36 +751,26 @@
             e.stopPropagation();
             openModal(firstDs, task.id);
           });
-          const topFrac = TRACK_TOP_FRAC;
-          const lineStepPx = LINE_STEP;
           line.style.left = Math.round(r1.left) + "px";
-          const headerTop = Math.max(r1.height * topFrac, HEADER_BASE_PX);
-          const baseTop = Math.round(r1.top + headerTop + HEADER_EXTRA_PX);
-          line.style.top = baseTop + slot * lineStepPx + "px";
+          line.style.top = baseTop + lane * LINE_STEP + "px";
           line.style.width = r2.right - r1.left + "px";
           layer.appendChild(line);
-
-          // 해당 라인이 실제 지나가는 날짜들만 점유 라인 수 갱신
-          dateRun.forEach((ds) => {
-            const prev = cellLaneMap.get(ds) || 0;
-            const need = slot + 1;
-            if (need > prev) cellLaneMap.set(ds, need);
-          });
         });
       });
     });
 
-    // 당일 시작·당일 완료 일정도 동일한 트랙 시스템으로 레이어에 렌더링
-    const allCells = [...calendarGrid.querySelectorAll(".calendar-cell[data-date-str]")];
-    allCells.forEach((cell) => {
+    // 당일 일정(occurrence가 하루짜리)도 같은 트랙 아래로 순차 배치
+    allCells.forEach((cell, idx) => {
       const ds = cell.dataset.dateStr || "";
       if (!ds) return;
+      const row = Math.floor(idx / 7);
       const list = sortTasksForDots(tasks.filter((t) => taskCoversDate(t, ds)));
       const singleDay = list.filter((t) => {
         const occ = getOccurrenceContaining(t, ds);
         return !!occ && occ.start === ds && occ.end === ds;
       });
       if (!singleDay.length) return;
+
       const r = {
         left: cell.offsetLeft,
         top: cell.offsetTop,
@@ -734,15 +778,18 @@
         width: cell.offsetWidth,
         height: cell.offsetHeight,
       };
+      const headerTop = Math.max(r.height * TRACK_TOP_FRAC, HEADER_BASE_PX);
+      const baseTop = Math.round(r.top + headerTop + HEADER_EXTRA_PX);
       singleDay.forEach((t) => {
         const lane = cellLaneMap.get(ds) || 0;
         cellLaneMap.set(ds, lane + 1);
+        rowSlots[row] = Math.max(rowSlots[row] || 0, lane + 1);
+        const impKey = t.importance === "high" ? "high" : t.importance === "low" ? "low" : "medium";
+        const impToken = "■ ";
+        const stKey = t.status === "on-going" ? "ongoing" : t.status === "done" ? "done" : "ready";
         const line = document.createElement("div");
         line.className = "calendar-range-line";
         line.style.background = statusBarColor(t.status);
-        const impKey = t.importance === "high" ? "high" : t.importance === "low" ? "low" : "medium";
-        const impToken = impKey === "high" ? "【H】 " : impKey === "low" ? "【L】 " : "【M】 ";
-        const stKey = t.status === "on-going" ? "ongoing" : t.status === "done" ? "done" : "ready";
         line.dataset.tipToken = impToken;
         line.dataset.tipBody = `${taskLabel(t)}`;
         line.classList.add(`calendar-range-line--tip-${stKey}`, `calendar-range-line--tip-imp-${impKey}`);
@@ -759,15 +806,12 @@
           openModal(ds, t.id);
         });
         line.style.left = Math.round(r.left) + "px";
-        const headerTop = Math.max(r.height * TRACK_TOP_FRAC, HEADER_BASE_PX);
-        const baseTop = Math.round(r.top + headerTop + HEADER_EXTRA_PX);
         line.style.top = baseTop + lane * LINE_STEP + "px";
         line.style.width = Math.round(r.width) + "px";
         layer.appendChild(line);
       });
     });
 
-    // 날짜별 실제 멀티데이 라인 개수를 각 셀에 전달해, 하루짜리 바 시작 위치를 adaptive 조정
     /** @type {Record<number, number>} */
     const rowLaneMax = {};
     allCells.forEach((cell, idx) => {
@@ -817,6 +861,8 @@
     draftImportance = "medium";
     taskTitle.value = "";
     taskDescription.value = "";
+    taskEffortValue.value = "";
+    taskEffortUnit.value = "MH";
     if (selectedDateStr) {
       taskStart.value = selectedDateStr;
       taskEnd.value = selectedDateStr;
@@ -842,6 +888,8 @@
       form: {
         title: taskTitle.value,
         description: taskDescription.value,
+        effortValue: taskEffortValue.value,
+        effortUnit: taskEffortUnit.value,
         startDate: taskStart.value,
         endDate: taskEnd.value,
         recurrence: /** @type {'none'|'daily'|'weekly'|'monthly'} */ (taskRecurrence.value),
@@ -858,6 +906,8 @@
     modalDefaultWhite = modalSessionSnapshot.modalDefaultWhite;
     taskTitle.value = modalSessionSnapshot.form.title;
     taskDescription.value = modalSessionSnapshot.form.description;
+    taskEffortValue.value = modalSessionSnapshot.form.effortValue;
+    taskEffortUnit.value = modalSessionSnapshot.form.effortUnit;
     taskStart.value = modalSessionSnapshot.form.startDate;
     taskEnd.value = modalSessionSnapshot.form.endDate;
     taskRecurrence.value = modalSessionSnapshot.form.recurrence;
@@ -1027,12 +1077,12 @@
     return s;
   }
 
-  function buildOngoingBadgeTooltip(ongoingTasks) {
-    if (!ongoingTasks.length) return "";
+  function buildDailyMhBadgeTooltip(dayEffortRows, remainingDailyMh, totalDailyMh) {
+    if (!dayEffortRows.length) return "";
     const maxLines = 15;
-    const lines = ongoingTasks.map((t) => taskLabel(t));
+    const lines = dayEffortRows.map((x) => `${taskLabel(x.task)} (${formatMh(x.dailyMh)}MH)`);
     const shown = lines.slice(0, maxLines);
-    let tip = `on-going ${ongoingTasks.length}건`;
+    let tip = `당일 공수 ${formatMh(remainingDailyMh)}/${formatMh(totalDailyMh)}MH (남은/전체)`;
     tip += "\n────────\n";
     tip += shown.map((lab, i) => `${i + 1}. ${lab}`).join("\n");
     if (lines.length > maxLines) tip += `\n… 외 ${lines.length - maxLines}건`;
@@ -1043,19 +1093,27 @@
     const list = tasks.filter((t) => taskCoversDate(t, dateStr));
     const ongoingTasks = list.filter((t) => t.status === "on-going");
     const ongoingCount = ongoingTasks.length;
+    const allEffortRows = list
+      .map((t) => ({ task: t, dailyMh: taskDailyMhOnDate(t, dateStr) }))
+      .filter((x) => x.dailyMh > 0);
+    const remainingEffortRows = allEffortRows.filter((x) => x.task.status !== "done");
+    const remainingDailyMh = remainingEffortRows.reduce((acc, x) => acc + x.dailyMh, 0);
+    const totalDailyMh = allEffortRows.reduce((acc, x) => acc + x.dailyMh, 0);
     const ongoingEl = cell.querySelector(".calendar-cell__ongoing-count");
     if (ongoingEl) {
-      if (ongoingCount > 0) {
-        ongoingEl.textContent = String(ongoingCount);
+      if (totalDailyMh > 0) {
+        ongoingEl.textContent = `${formatMh(remainingDailyMh)}/${formatMh(totalDailyMh)}`;
         ongoingEl.hidden = false;
-        ongoingEl.title = buildOngoingBadgeTooltip(ongoingTasks);
+        ongoingEl.classList.toggle("calendar-cell__ongoing-count--complete", remainingDailyMh <= 0.0001);
+        ongoingEl.title = buildDailyMhBadgeTooltip(allEffortRows, remainingDailyMh, totalDailyMh);
         ongoingEl.setAttribute(
           "aria-label",
-          `${dateStr} on-going ${ongoingCount}건: ${ongoingTasks.map(taskLabel).join(", ")}`
+          `${dateStr} 당일 공수 ${formatMh(remainingDailyMh)}/${formatMh(totalDailyMh)}MH (남은/전체): ${allEffortRows.map((x) => taskLabel(x.task)).join(", ")}`
         );
       } else {
         ongoingEl.textContent = "";
         ongoingEl.hidden = true;
+        ongoingEl.classList.remove("calendar-cell__ongoing-count--complete");
         ongoingEl.removeAttribute("title");
         ongoingEl.removeAttribute("aria-label");
       }
@@ -1078,13 +1136,12 @@
 
 
     if (dots && list.length) {
-      const maxDots = 8;
-      const sorted = sortTasksForDots(list);
-      sorted.slice(0, maxDots).forEach((t) => {
+      const sorted = getVisibleTasksForCalendarDay(dateStr);
+      sorted.forEach((t) => {
         const wrap = document.createElement("span");
         wrap.className = importanceWrapClass(t.importance || "medium");
         const impKey = t.importance === "high" ? "high" : t.importance === "low" ? "low" : "medium";
-        const impToken = impKey === "high" ? "【H】 " : impKey === "low" ? "【L】 " : "【M】 ";
+        const impToken = "■ ";
         const stKey = t.status === "on-going" ? "ongoing" : t.status === "done" ? "done" : "ready";
         wrap.dataset.tipToken = impToken;
         wrap.dataset.tipBody = `${taskLabel(t)}`;
@@ -1108,11 +1165,12 @@
         wrap.appendChild(inner);
         dots.appendChild(wrap);
       });
-      if (sorted.length > maxDots) {
+      const fullSorted = sortTasksForDots(list);
+      if (fullSorted.length > MAX_CALENDAR_DOTS) {
         const more = document.createElement("span");
         more.className = "calendar-cell__more";
-        more.textContent = "+" + (sorted.length - maxDots);
-        more.title = `외 ${sorted.length - maxDots}건`;
+        more.textContent = "+" + (fullSorted.length - MAX_CALENDAR_DOTS);
+        more.title = `외 ${fullSorted.length - MAX_CALENDAR_DOTS}건`;
         dots.appendChild(more);
       }
     }
@@ -1140,6 +1198,8 @@
     const fillFormFromTask = (t) => {
       taskTitle.value = t.title || "";
       taskDescription.value = t.description || "";
+      taskEffortValue.value = t.effortValue != null && Number(t.effortValue) > 0 ? String(t.effortValue) : "";
+      taskEffortUnit.value = t.effortUnit === "MD" ? "MD" : "MH";
       taskStart.value = t.startDate;
       taskEnd.value = t.endDate;
       taskRecurrence.value = t.recurrence || "none";
@@ -1174,6 +1234,8 @@
         draftImportance = "medium";
         taskTitle.value = "";
         taskDescription.value = "";
+        taskEffortValue.value = "";
+        taskEffortUnit.value = "MH";
         taskStart.value = dateStr;
         taskEnd.value = dateStr;
         taskRecurrence.value = "none";
@@ -1232,8 +1294,11 @@
       const short = lab.length > 42 ? lab.slice(0, 40) + "…" : lab;
       const recBadge = t.recurrence && t.recurrence !== "none" ? ` · ${t.recurrence}` : "";
       const imp = t.importance || "medium";
-      const impToken = imp === "high" ? "H" : imp === "low" ? "L" : "M";
-      btn.innerHTML = `<span class="task-chip__desc"><span class="task-chip__imp task-chip__imp--${imp}">【${impToken}】</span>${escapeHtml(short)}${escapeHtml(recBadge)}</span><span class="task-chip__status">${escapeHtml(t.status)}</span>`;
+      const effortBadge =
+        t.effortValue != null && Number(t.effortValue) > 0
+          ? ` · ${escapeHtml(String(t.effortValue))}${escapeHtml(t.effortUnit === "MD" ? "MD" : "MH")}`
+          : "";
+      btn.innerHTML = `<span class="task-chip__desc"><span class="task-chip__imp task-chip__imp--${imp}" aria-hidden="true"></span>${escapeHtml(short)}${escapeHtml(recBadge)}${effortBadge}</span><span class="task-chip__status">${escapeHtml(t.status)}</span>`;
       btn.title = "클릭: 상세 편집 · 호버: 상태/중요도/삭제";
       btn.addEventListener("click", () => {
         editingId = t.id;
@@ -1242,6 +1307,8 @@
         draftStatus = t.status || "ready";
         draftImportance = t.importance || "medium";
         taskDescription.value = t.description || "";
+        taskEffortValue.value = t.effortValue != null && Number(t.effortValue) > 0 ? String(t.effortValue) : "";
+        taskEffortUnit.value = t.effortUnit === "MD" ? "MD" : "MH";
         taskStart.value = t.startDate;
         taskEnd.value = t.endDate;
         taskRecurrence.value = t.recurrence || "none";
@@ -1677,6 +1744,9 @@
     const title = taskTitle.value.trim();
     const status = getCurrentStatus();
     const description = taskDescription.value.trim();
+    const effortRaw = Number(taskEffortValue.value);
+    const effortValue = Number.isFinite(effortRaw) && effortRaw > 0 ? Math.round(effortRaw * 100) / 100 : null;
+    const effortUnit = taskEffortUnit.value === "MD" ? "MD" : "MH";
     const startDate = taskStart.value;
     const endDate = taskEnd.value;
     const recurrence = /** @type {'none'|'daily'|'weekly'|'monthly'} */ (taskRecurrence.value);
@@ -1684,8 +1754,13 @@
     const importance = /** @type {'high'|'medium'|'low'} */ (getCurrentImportance());
 
     // 새 항목에서 제목/설명이 모두 비면 저장하지 않고 닫는다 (유령 항목 생성 방지)
-    if (!editingId && !title && !description) {
+    if (!editingId && !title && !description && !effortValue) {
       closeModal();
+      return;
+    }
+
+    if (taskEffortValue.value.trim() !== "" && (!Number.isFinite(effortRaw) || effortRaw <= 0)) {
+      await openAlertDialog("투입예상공수는 0보다 큰 숫자로 입력해 주세요.");
       return;
     }
 
@@ -1720,6 +1795,8 @@
       endDate,
       recurrence,
       recurrenceUntil,
+      effortValue,
+      effortUnit,
     };
 
     if (editingId) {
