@@ -612,9 +612,11 @@
     const layerRect = layer.getBoundingClientRect();
     if (layerRect.width < 1 || layerRect.height < 1) return;
     const BAR_HEIGHT = 6;
-    const BAR_GAP = 4;
+    const BAR_GAP = 3;
     const LINE_STEP = BAR_HEIGHT + BAR_GAP;
     const TRACK_TOP_FRAC = 0.32;
+    const HEADER_BASE_PX = 28; // 날짜/공휴일 텍스트 영역 최소 확보
+    const HEADER_EXTRA_PX = 2; // 시인성 확보용 추가 간격(항상 적용)
     /** @type {Record<number, number>} */
     const rowSlots = {};
     /** @type {Map<number, Map<string, Set<number>>>} row별 날짜별 lane 점유 */
@@ -698,7 +700,8 @@
           const topFrac = TRACK_TOP_FRAC;
           const lineStepPx = LINE_STEP;
           line.style.left = Math.round(r1.left) + "px";
-          const baseTop = Math.round(r1.top + r1.height * topFrac);
+          const headerTop = Math.max(r1.height * topFrac, HEADER_BASE_PX);
+          const baseTop = Math.round(r1.top + headerTop + HEADER_EXTRA_PX);
           line.style.top = baseTop + slot * lineStepPx + "px";
           line.style.width = r2.right - r1.left + "px";
           layer.appendChild(line);
@@ -756,7 +759,8 @@
           openModal(ds, t.id);
         });
         line.style.left = Math.round(r.left) + "px";
-        const baseTop = Math.round(r.top + r.height * TRACK_TOP_FRAC);
+        const headerTop = Math.max(r.height * TRACK_TOP_FRAC, HEADER_BASE_PX);
+        const baseTop = Math.round(r.top + headerTop + HEADER_EXTRA_PX);
         line.style.top = baseTop + lane * LINE_STEP + "px";
         line.style.width = Math.round(r.width) + "px";
         layer.appendChild(line);
@@ -798,9 +802,9 @@
       });
       const taskExtra = Math.max(0, maxTasks - 4) * 6;
       const lanes = Math.max(rowSlots[row] || 0, rowLaneMax[row] || 0);
-      // renderMultiDayRangeLines 의 LINE_STEP(=6px bar + 4px gap)과 동기화
-      const lineExtra = Math.max(0, lanes - 3) * 10;
-      const h = Math.min(150, 88 + taskExtra + lineExtra);
+      // renderMultiDayRangeLines 의 LINE_STEP(=6px bar + 3px gap)과 동기화
+      const lineExtra = Math.max(0, lanes - 3) * 9;
+      const h = Math.min(180, 88 + taskExtra + lineExtra);
       rows.push(`${h}px`);
     }
     calendarGrid.style.gridTemplateRows = rows.join(" ");
