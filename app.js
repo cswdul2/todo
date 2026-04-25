@@ -658,11 +658,10 @@
             e.stopPropagation();
             openModal(firstDs, task.id);
           });
-          const slotClamped = Math.min(slot, 8);
           const topFrac = TRACK_TOP_FRAC;
           const lineStepPx = LINE_STEP;
           line.style.left = r1.left - layerRect.left + "px";
-          line.style.top = r1.top - layerRect.top + r1.height * topFrac + slotClamped * lineStepPx + "px";
+          line.style.top = r1.top - layerRect.top + r1.height * topFrac + slot * lineStepPx + "px";
           line.style.width = r2.right - r1.left + "px";
           layer.appendChild(line);
 
@@ -689,7 +688,7 @@
       if (!singleDay.length) return;
       const r = cell.getBoundingClientRect();
       singleDay.forEach((t) => {
-        const lane = Math.min(cellLaneMap.get(ds) || 0, 8);
+        const lane = cellLaneMap.get(ds) || 0;
         cellLaneMap.set(ds, lane + 1);
         const line = document.createElement("div");
         line.className = "calendar-range-line";
