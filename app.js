@@ -612,11 +612,13 @@
     const layerRect = layer.getBoundingClientRect();
     if (layerRect.width < 1 || layerRect.height < 1) return;
     const BAR_HEIGHT = 6;
-    const BAR_GAP = 3;
+    const BAR_GAP = 4;
     const LINE_STEP = BAR_HEIGHT + BAR_GAP;
     const TRACK_TOP_FRAC = 0.32;
     /** @type {Record<number, number>} */
     const rowSlots = {};
+    /** @type {Map<number, Map<string, Set<number>>>} row별 날짜별 lane 점유 */
+    const rowDayLaneUsage = new Map();
     /** @type {Map<string, number>} 날짜별 실제 점유 라인 수 */
     const cellLaneMap = new Map();
 
@@ -632,11 +634,46 @@
           const allCells = [...calendarGrid.querySelectorAll(".calendar-cell")];
           const idx = allCells.indexOf(firstCell);
           const row = Math.floor(idx / 7);
-          const slot = rowSlots[row] || 0;
-          rowSlots[row] = slot + 1;
+          let dayUsage = rowDayLaneUsage.get(row);
+          if (!dayUsage) {
+            dayUsage = new Map();
+            rowDayLaneUsage.set(row, dayUsage);
+          }
+          // 이 dateRun 전체에서 충돌하지 않는 가장 낮은 lane을 찾는다.
+          let slot = 0;
+          while (true) {
+            const occupied = dateRun.some((ds) => {
+              const used = dayUsage.get(ds);
+              return !!used && used.has(slot);
+            });
+            if (!occupied) break;
+            slot += 1;
+          }
+          // 선택된 lane을 run에 포함된 모든 날짜에 점유 표시
+          dateRun.forEach((ds) => {
+            let used = dayUsage.get(ds);
+            if (!used) {
+              used = new Set();
+              dayUsage.set(ds, used);
+            }
+            used.add(slot);
+          });
+          rowSlots[row] = Math.max(rowSlots[row] || 0, slot + 1);
 
-          const r1 = firstCell.getBoundingClientRect();
-          const r2 = lastCell.getBoundingClientRect();
+          const r1 = {
+            left: firstCell.offsetLeft,
+            top: firstCell.offsetTop,
+            right: firstCell.offsetLeft + firstCell.offsetWidth,
+            width: firstCell.offsetWidth,
+            height: firstCell.offsetHeight,
+          };
+          const r2 = {
+            left: lastCell.offsetLeft,
+            top: lastCell.offsetTop,
+            right: lastCell.offsetLeft + lastCell.offsetWidth,
+            width: lastCell.offsetWidth,
+            height: lastCell.offsetHeight,
+          };
           const line = document.createElement("div");
           line.className = "calendar-range-line";
           line.style.background = rangeLineColorForTask(task, endStr);
@@ -660,15 +697,16 @@
           });
           const topFrac = TRACK_TOP_FRAC;
           const lineStepPx = LINE_STEP;
-          line.style.left = r1.left - layerRect.left + "px";
-          line.style.top = r1.top - layerRect.top + r1.height * topFrac + slot * lineStepPx + "px";
+          line.style.left = Math.round(r1.left) + "px";
+          const baseTop = Math.round(r1.top + r1.height * topFrac);
+          line.style.top = baseTop + slot * lineStepPx + "px";
           line.style.width = r2.right - r1.left + "px";
           layer.appendChild(line);
 
           // 해당 라인이 실제 지나가는 날짜들만 점유 라인 수 갱신
           dateRun.forEach((ds) => {
             const prev = cellLaneMap.get(ds) || 0;
-            const need = slotClamped + 1;
+            const need = slot + 1;
             if (need > prev) cellLaneMap.set(ds, need);
           });
         });
@@ -686,7 +724,13 @@
         return !!occ && occ.start === ds && occ.end === ds;
       });
       if (!singleDay.length) return;
-      const r = cell.getBoundingClientRect();
+      const r = {
+        left: cell.offsetLeft,
+        top: cell.offsetTop,
+        right: cell.offsetLeft + cell.offsetWidth,
+        width: cell.offsetWidth,
+        height: cell.offsetHeight,
+      };
       singleDay.forEach((t) => {
         const lane = cellLaneMap.get(ds) || 0;
         cellLaneMap.set(ds, lane + 1);
@@ -711,9 +755,10 @@
           e.stopPropagation();
           openModal(ds, t.id);
         });
-        line.style.left = r.left - layerRect.left + "px";
-        line.style.top = r.top - layerRect.top + r.height * TRACK_TOP_FRAC + lane * LINE_STEP + "px";
-        line.style.width = r.width + "px";
+        line.style.left = Math.round(r.left) + "px";
+        const baseTop = Math.round(r.top + r.height * TRACK_TOP_FRAC);
+        line.style.top = baseTop + lane * LINE_STEP + "px";
+        line.style.width = Math.round(r.width) + "px";
         layer.appendChild(line);
       });
     });
@@ -753,7 +798,8 @@
       });
       const taskExtra = Math.max(0, maxTasks - 4) * 6;
       const lanes = Math.max(rowSlots[row] || 0, rowLaneMax[row] || 0);
-      const lineExtra = Math.max(0, lanes - 3) * 9;
+      // renderMultiDayRangeLines 의 LINE_STEP(=6px bar + 4px gap)과 동기화
+      const lineExtra = Math.max(0, lanes - 3) * 10;
       const h = Math.min(150, 88 + taskExtra + lineExtra);
       rows.push(`${h}px`);
     }
