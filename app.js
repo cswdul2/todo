@@ -344,6 +344,12 @@
     }
   }
 
+  function statusBarColor(status) {
+    if (status === "on-going") return "#e8943a";
+    if (status === "done") return "#43a047";
+    return "#8b95a5";
+  }
+
   const MODAL_THEME_CLASSES = ["modal__inner--default", "modal__inner--ready", "modal__inner--ongoing", "modal__inner--done"];
 
   function getEditingTask() {
@@ -605,8 +611,14 @@
     layer.innerHTML = "";
     const layerRect = layer.getBoundingClientRect();
     if (layerRect.width < 1 || layerRect.height < 1) return;
+    const BAR_HEIGHT = 6;
+    const BAR_GAP = 3;
+    const LINE_STEP = BAR_HEIGHT + BAR_GAP;
+    const TRACK_TOP_FRAC = 0.32;
     /** @type {Record<number, number>} */
     const rowSlots = {};
+    /** @type {Map<string, number>} 날짜별 실제 점유 라인 수 */
+    const cellLaneMap = new Map();
 
     tasks.forEach((task) => {
       forEachMultiDaySegment(task, (startStr, endStr) => {
@@ -628,24 +640,103 @@
           const line = document.createElement("div");
           line.className = "calendar-range-line";
           line.style.background = rangeLineColorForTask(task, endStr);
+          const impKey = task.importance === "high" ? "high" : task.importance === "low" ? "low" : "medium";
+          const impToken = impKey === "high" ? "【H】 " : impKey === "low" ? "【L】 " : "【M】 ";
+          const stKey = task.status === "on-going" ? "ongoing" : task.status === "done" ? "done" : "ready";
+          line.dataset.tipToken = impToken;
+          line.dataset.tipBody = `${taskLabel(task)}`;
+          line.classList.add(`calendar-range-line--tip-${stKey}`, `calendar-range-line--tip-imp-${impKey}`);
+          line.tabIndex = 0;
+          line.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            openModal(firstDs, task.id);
+          });
+          line.addEventListener("keydown", (e) => {
+            if (e.key !== "Enter" && e.key !== " ") return;
+            e.preventDefault();
+            e.stopPropagation();
+            openModal(firstDs, task.id);
+          });
           const slotClamped = Math.min(slot, 8);
-          const topFrac = 0.34;
-          const lineStepPx = 4; // 3px 선 + 1px 간격
+          const topFrac = TRACK_TOP_FRAC;
+          const lineStepPx = LINE_STEP;
           line.style.left = r1.left - layerRect.left + "px";
           line.style.top = r1.top - layerRect.top + r1.height * topFrac + slotClamped * lineStepPx + "px";
           line.style.width = r2.right - r1.left + "px";
           layer.appendChild(line);
+
+          // 해당 라인이 실제 지나가는 날짜들만 점유 라인 수 갱신
+          dateRun.forEach((ds) => {
+            const prev = cellLaneMap.get(ds) || 0;
+            const need = slotClamped + 1;
+            if (need > prev) cellLaneMap.set(ds, need);
+          });
         });
       });
     });
-    applyCalendarRowHeights(rowSlots);
+
+    // 당일 시작·당일 완료 일정도 동일한 트랙 시스템으로 레이어에 렌더링
+    const allCells = [...calendarGrid.querySelectorAll(".calendar-cell[data-date-str]")];
+    allCells.forEach((cell) => {
+      const ds = cell.dataset.dateStr || "";
+      if (!ds) return;
+      const list = sortTasksForDots(tasks.filter((t) => taskCoversDate(t, ds)));
+      const singleDay = list.filter((t) => {
+        const occ = getOccurrenceContaining(t, ds);
+        return !!occ && occ.start === ds && occ.end === ds;
+      });
+      if (!singleDay.length) return;
+      const r = cell.getBoundingClientRect();
+      singleDay.forEach((t) => {
+        const lane = Math.min(cellLaneMap.get(ds) || 0, 8);
+        cellLaneMap.set(ds, lane + 1);
+        const line = document.createElement("div");
+        line.className = "calendar-range-line";
+        line.style.background = statusBarColor(t.status);
+        const impKey = t.importance === "high" ? "high" : t.importance === "low" ? "low" : "medium";
+        const impToken = impKey === "high" ? "【H】 " : impKey === "low" ? "【L】 " : "【M】 ";
+        const stKey = t.status === "on-going" ? "ongoing" : t.status === "done" ? "done" : "ready";
+        line.dataset.tipToken = impToken;
+        line.dataset.tipBody = `${taskLabel(t)}`;
+        line.classList.add(`calendar-range-line--tip-${stKey}`, `calendar-range-line--tip-imp-${impKey}`);
+        line.tabIndex = 0;
+        line.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          openModal(ds, t.id);
+        });
+        line.addEventListener("keydown", (e) => {
+          if (e.key !== "Enter" && e.key !== " ") return;
+          e.preventDefault();
+          e.stopPropagation();
+          openModal(ds, t.id);
+        });
+        line.style.left = r.left - layerRect.left + "px";
+        line.style.top = r.top - layerRect.top + r.height * TRACK_TOP_FRAC + lane * LINE_STEP + "px";
+        line.style.width = r.width + "px";
+        layer.appendChild(line);
+      });
+    });
+
+    // 날짜별 실제 멀티데이 라인 개수를 각 셀에 전달해, 하루짜리 바 시작 위치를 adaptive 조정
+    /** @type {Record<number, number>} */
+    const rowLaneMax = {};
+    allCells.forEach((cell, idx) => {
+      const ds = cell.dataset.dateStr || "";
+      const lanes = cellLaneMap.get(ds) || 0;
+      cell.style.setProperty("--range-lanes", String(lanes));
+      const row = Math.floor(idx / 7);
+      rowLaneMax[row] = Math.max(rowLaneMax[row] || 0, lanes);
+    });
+    applyCalendarRowHeights(rowSlots, rowLaneMax);
   }
 
   /**
    * 일정 밀도에 따라 해당 주의 행 높이를 늘린다.
    * @param {Record<number, number>} rowSlots
    */
-  function applyCalendarRowHeights(rowSlots) {
+  function applyCalendarRowHeights(rowSlots, rowLaneMax = {}) {
     if (!calendarGrid) return;
     const cells = [...calendarGrid.querySelectorAll(".calendar-cell[data-date-str]")];
     const rowCount = Math.ceil(cells.length / 7);
@@ -662,7 +753,8 @@
         if (c > maxTasks) maxTasks = c;
       });
       const taskExtra = Math.max(0, maxTasks - 4) * 6;
-      const lineExtra = Math.max(0, (rowSlots[row] || 0) - 3) * 4;
+      const lanes = Math.max(rowSlots[row] || 0, rowLaneMax[row] || 0);
+      const lineExtra = Math.max(0, lanes - 3) * 9;
       const h = Math.min(150, 88 + taskExtra + lineExtra);
       rows.push(`${h}px`);
     }
@@ -934,6 +1026,7 @@
     const hasOverdue = list.some((t) => isTaskOverdueOnDate(t, dateStr));
     if (hasOverdue) cell.classList.add("calendar-cell--overdue");
     else cell.classList.remove("calendar-cell--overdue");
+
 
     if (dots && list.length) {
       const maxDots = 8;
