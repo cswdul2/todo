@@ -548,6 +548,16 @@
     await firebaseDb.ref(FIREBASE_META_PATH).update({ updatedAt: new Date().toISOString() });
   }
 
+  async function waitForFirebaseReady(timeoutMs = 8000) {
+    const start = Date.now();
+    while (!firebaseDb || !firebaseTasksRef) {
+      if (Date.now() - start > timeoutMs) {
+        throw new Error("Firebase 연결이 아직 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.");
+      }
+      await new Promise((r) => setTimeout(r, 120));
+    }
+  }
+
   function uuid() {
     return crypto.randomUUID ? crypto.randomUUID() : `t-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   }
@@ -2125,22 +2135,25 @@
       const newTasks = payloads.map((p) => normalizeTask({ id: uuid(), ...p }));
       const prevTasks = tasks.slice();
       try {
+        ocrStatus.textContent = "달력에 저장 중…";
+        btnOcrApply.disabled = true;
+        await waitForFirebaseReady();
         tasks.push(...newTasks);
-        if (firebaseDb && firebaseTasksRef) {
-          for (const t of newTasks) {
-            await firebaseCreateTask(t);
-          }
-        } else {
-          throw new Error("Firebase 연결이 아직 준비되지 않았습니다.");
+        for (const t of newTasks) {
+          await firebaseCreateTask(t);
         }
         renderCalendar();
+        ocrStatus.textContent = `저장 완료: ${newTasks.length}건`;
         closeOcrModal();
       } catch (e) {
         tasks = prevTasks;
         renderCalendar();
         console.error("OCR apply failed:", e);
         const msg = e instanceof Error ? e.message : String(e);
+        ocrStatus.textContent = "저장 실패: " + msg;
         alert("달력 저장 중 오류가 발생했습니다: " + msg);
+      } finally {
+        btnOcrApply.disabled = false;
       }
     });
   }
