@@ -70,6 +70,8 @@
   const importFileInput = document.getElementById("importFileInput");
 
   const btnOpenOcr = document.getElementById("btnOpenOcr");
+  const btnOpenCamera = document.getElementById("btnOpenCamera");
+  const cameraFileInput = document.getElementById("cameraFileInput");
   const ocrBackdrop = document.getElementById("ocrBackdrop");
   const ocrModal = document.getElementById("ocrModal");
   const geminiApiKeyInput = document.getElementById("geminiApiKey");
@@ -1832,6 +1834,17 @@
     reader.readAsDataURL(f);
   }
 
+  function openCameraCapture() {
+    if (!(cameraFileInput instanceof HTMLInputElement)) return;
+    if (!("mediaDevices" in navigator)) {
+      openAlertDialog("이 기기/브라우저는 카메라 촬영을 지원하지 않습니다.");
+      return;
+    }
+    openOcrModal();
+    cameraFileInput.value = "";
+    cameraFileInput.click();
+  }
+
   function closeModal() {
     modalBackdrop.hidden = true;
     taskModal.hidden = true;
@@ -2070,6 +2083,8 @@
 
   if (
     btnOpenOcr &&
+    btnOpenCamera &&
+    cameraFileInput &&
     ocrModal &&
     ocrBackdrop &&
     btnOcrClose &&
@@ -2086,6 +2101,7 @@
     btnOcrApply
   ) {
     btnOpenOcr.addEventListener("click", openOcrModal);
+    btnOpenCamera.addEventListener("click", openCameraCapture);
     btnOcrClose.addEventListener("click", closeOcrModal);
     ocrBackdrop.addEventListener("click", closeOcrModal);
     btnSaveGeminiKey.addEventListener("click", () => {
@@ -2094,6 +2110,10 @@
     });
     ocrFileInput.addEventListener("change", () => {
       const f = ocrFileInput.files && ocrFileInput.files[0];
+      handleSelectedOcrFile(f || null);
+    });
+    cameraFileInput.addEventListener("change", () => {
+      const f = cameraFileInput.files && cameraFileInput.files[0];
       handleSelectedOcrFile(f || null);
     });
     ocrDropZone.addEventListener("click", () => ocrFileInput.click());
