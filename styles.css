@@ -488,14 +488,21 @@ body {
   opacity: 0.45;
 }
 
-/* 오늘(연체 아님): 파란 테두리 + 링. 연체이면 아래 .calendar-cell--overdue 가 점선 우선 */
+/* 오늘(연체 아님): 셀 위치는 고정하고 가장자리 입체 효과만 강조 */
 .calendar-cell--today:not(.calendar-cell--overdue) {
-  border-color: var(--accent);
+  border-color: #4f84dc;
   box-shadow:
-    0 0 0 1px var(--today-ring),
-    0 12px 24px rgba(15, 23, 42, 0.34),
-    0 2px 0 rgba(255, 255, 255, 0.65) inset;
-  transform: translateY(-3px) scale(1.012);
+    0 0 0 2px rgba(74, 127, 212, 0.52),
+    0 14px 28px rgba(15, 23, 42, 0.34),
+    0 3px 0 rgba(255, 255, 255, 0.9) inset,
+    0 -2px 0 rgba(90, 127, 180, 0.32) inset,
+    0 0 22px rgba(96, 165, 250, 0.2);
+}
+
+.calendar-cell--today .calendar-cell__num,
+.calendar-cell--today .calendar-cell__dots {
+  position: relative;
+  z-index: 1;
 }
 
 /* on-going 중요도 합산: 8점↑ 주황, 4~7 연노랑, 3↓ 연하늘 (배경은 heat 클래스가 우선) */
@@ -543,19 +550,21 @@ body {
 .calendar-cell--today.calendar-cell--heat-mid:not(.calendar-cell--overdue),
 .calendar-cell--today.calendar-cell--heat-high:not(.calendar-cell--overdue) {
   box-shadow:
-    0 0 0 1px var(--today-ring),
-    0 12px 24px rgba(15, 23, 42, 0.34),
-    0 2px 0 rgba(255, 255, 255, 0.65) inset;
-  transform: translateY(-3px) scale(1.012);
+    0 0 0 2px rgba(74, 127, 212, 0.52),
+    0 14px 28px rgba(15, 23, 42, 0.34),
+    0 3px 0 rgba(255, 255, 255, 0.9) inset,
+    0 -2px 0 rgba(90, 127, 180, 0.32) inset,
+    0 0 22px rgba(96, 165, 250, 0.2);
 }
 
 /* 오늘이면서 연체: 파란 링 + 적색 점선 */
 .calendar-cell--today.calendar-cell--overdue {
   box-shadow:
-    0 0 0 1px var(--today-ring),
-    0 12px 24px rgba(15, 23, 42, 0.34),
-    0 2px 0 rgba(255, 255, 255, 0.65) inset;
-  transform: translateY(-3px) scale(1.012);
+    0 0 0 2px rgba(74, 127, 212, 0.52),
+    0 14px 28px rgba(15, 23, 42, 0.34),
+    0 3px 0 rgba(255, 255, 255, 0.9) inset,
+    0 -2px 0 rgba(90, 127, 180, 0.32) inset,
+    0 0 22px rgba(96, 165, 250, 0.2);
 }
 
 .calendar-cell--overdue.calendar-cell--heat-low:hover:not(:disabled) {
@@ -586,16 +595,12 @@ body {
 }
 
 .calendar-cell--today .calendar-cell__num::after {
-  content: "★";
-  margin-left: 0.22rem;
-  color: var(--accent);
-  font-size: 0.78em;
-  vertical-align: 0.05em;
+  content: none;
 }
 
 .calendar-cell--today .calendar-cell__num {
   color: #334155;
-  text-shadow: 0 2px 4px rgba(15, 23, 42, 0.36);
+  text-shadow: 0 2px 6px rgba(15, 23, 42, 0.42);
   font-weight: 800;
 }
 
@@ -1069,6 +1074,7 @@ body {
 }
 
 .ocr-draft-item {
+  position: relative;
   display: flex;
   gap: 0.5rem;
   align-items: flex-start;
@@ -1087,6 +1093,7 @@ body {
   gap: 0.25rem;
   cursor: pointer;
   padding-top: 0.35rem;
+  min-height: 1.45rem;
 }
 
 .ocr-draft-fields {
@@ -1098,7 +1105,9 @@ body {
 }
 
 .ocr-draft-confidence {
-  align-self: flex-start;
+  position: absolute;
+  top: 0.46rem;
+  right: 0.62rem;
   font-size: 0.72rem;
   font-weight: 700;
   color: #1d4ed8;
@@ -1106,10 +1115,12 @@ body {
   border: 1px solid #93c5fd;
   border-radius: 999px;
   padding: 0.12rem 0.45rem;
+  line-height: 1.2;
 }
 
 .ocr-draft-title {
   width: 100%;
+  padding-right: 7.3rem;
 }
 
 .ocr-draft-dates {
@@ -1144,6 +1155,16 @@ body {
 
 .ocr-draft-meta select {
   margin-left: 0.25rem;
+  font: inherit;
+  font-size: 0.8rem;
+  padding: 0.2rem 0.35rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.ocr-draft-meta input[type="number"] {
+  margin-left: 0.25rem;
+  width: 6.4rem;
   font: inherit;
   font-size: 0.8rem;
   padding: 0.2rem 0.35rem;
@@ -1386,9 +1407,9 @@ body {
 }
 
 .modal__quick-meta-label {
-  font-size: 0.78rem;
-  font-weight: 700;
-  color: #475569;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #3d4a5c;
   min-width: 0;
   white-space: nowrap;
   letter-spacing: -0.01em;
@@ -1960,8 +1981,9 @@ body {
   top: 50%;
   z-index: 200;
   display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.24rem;
   padding: 0.3rem 0.35rem;
   border: 1px solid #cbd5e1;
   border-radius: 8px;
@@ -1972,6 +1994,13 @@ body {
   pointer-events: none;
   transition: opacity 0.12s ease, filter 0.12s ease;
   filter: drop-shadow(0 2px 6px rgba(15, 23, 42, 0.14));
+}
+
+.task-chip__quick-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  width: 100%;
 }
 
 .task-chip-item:hover .task-chip__quick,

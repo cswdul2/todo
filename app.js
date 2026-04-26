@@ -107,7 +107,7 @@
   /** 선호 모델 순서 (실제 가용 모델과 교집합으로 선택) */
   const GEMINI_MODEL_PREFER = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
 
-  /** @type {Array<(Omit<Task, 'id'> & { id?: string }) & { confidence?: number }>} */
+  /** @type {Array<{ title: string, description: string, status: string, importance: string, startDate: string, endDate: string, effortValue: number | null, effortUnit: 'MH'|'MD', recurrence: 'none', recurrenceUntil: null, confidence?: number }>} */
   let ocrDraftRows = [];
   /** 새 일정 작성용 임시 상태/중요도 */
   let draftStatus = "ready";
@@ -1323,7 +1323,9 @@
       const quick = document.createElement("div");
       quick.className = "task-chip__quick";
       quick.setAttribute("role", "tooltip");
-      quick.innerHTML = `<span class="task-chip__quick-label">상태</span>`;
+      const statusRow = document.createElement("div");
+      statusRow.className = "task-chip__quick-row";
+      statusRow.innerHTML = `<span class="task-chip__quick-label">상태</span>`;
       STATUS_CHOICES.forEach((st) => {
         const q = document.createElement("button");
         q.type = "button";
@@ -1342,12 +1344,15 @@
           applyModalTheme();
           renderExistingTasksList();
         });
-        quick.appendChild(q);
+        statusRow.appendChild(q);
       });
+      quick.appendChild(statusRow);
+      const impRow = document.createElement("div");
+      impRow.className = "task-chip__quick-row";
       const impLabel = document.createElement("span");
       impLabel.className = "task-chip__quick-label";
       impLabel.textContent = "중요도";
-      quick.appendChild(impLabel);
+      impRow.appendChild(impLabel);
       IMP_CHOICES.forEach((impKey) => {
         const iq = document.createElement("button");
         iq.type = "button";
@@ -1365,8 +1370,11 @@
           applyModalTheme();
           renderExistingTasksList();
         });
-        quick.appendChild(iq);
+        impRow.appendChild(iq);
       });
+      quick.appendChild(impRow);
+      const actionRow = document.createElement("div");
+      actionRow.className = "task-chip__quick-row";
       const del = document.createElement("button");
       del.type = "button";
       del.className = "task-chip__quick-btn task-chip__quick-btn--danger";
@@ -1389,7 +1397,8 @@
         renderCalendar();
         renderExistingTasksList();
       });
-      quick.appendChild(del);
+      actionRow.appendChild(del);
+      quick.appendChild(actionRow);
 
       li.appendChild(btn);
       li.appendChild(quick);
@@ -1478,14 +1487,15 @@
   }
 
   function coerceOcrItem(o, todayStr) {
-    const title = (o.title != null && String(o.title).trim()) || "(제목 없음)";
-    let startDate =
-      typeof o.startDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(o.startDate) ? o.startDate : todayStr;
-    let endDate =
-      typeof o.endDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(o.endDate) ? o.endDate : startDate;
-    if (parseDateStr(startDate) > parseDateStr(endDate)) endDate = startDate;
-    const status = ["ready", "on-going", "done"].includes(o.status) ? o.status : "ready";
-    const importance = ["high", "medium", "low"].includes(o.importance) ? o.importance : "medium";
+    const title = o.title != null ? String(o.title).trim() : "";
+    let startDate = typeof o.startDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(o.startDate) ? o.startDate : "";
+    let endDate = typeof o.endDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(o.endDate) ? o.endDate : "";
+    if (startDate && endDate && parseDateStr(startDate) > parseDateStr(endDate)) endDate = startDate;
+    const status = ["ready", "on-going", "done"].includes(o.status) ? o.status : "";
+    const importance = ["high", "medium", "low"].includes(o.importance) ? o.importance : "";
+    const rawEffort = Number(o.effortValue);
+    const effortValue = Number.isFinite(rawEffort) && rawEffort > 0 ? Math.round(rawEffort * 100) / 100 : null;
+    const effortUnit = o.effortUnit === "MD" ? "MD" : "MH";
     const description = o.description != null ? String(o.description) : "";
     const rawC = Number(o.confidence);
     let confidence = Number.isFinite(rawC) ? rawC : NaN;
@@ -1503,6 +1513,8 @@
       description,
       status,
       importance,
+      effortValue,
+      effortUnit,
       startDate,
       endDate,
       recurrence: /** @type {'none'} */ ("none"),
@@ -1520,13 +1532,14 @@
     const todayStr = toDateStrFromDate(new Date());
     const prompt = `이 이미지는 한글로 적힌 할일 목록(손글씨 또는 인쇄)입니다. 모든 할일을 읽어 JSON 배열만 출력하세요.
 
-스키마: 각 원소는 {"title": string, "startDate": "YYYY-MM-DD", "endDate": "YYYY-MM-DD", "status": "ready"|"on-going"|"done", "importance": "high"|"medium"|"low", "description": string, "confidence": number}
+스키마: 각 원소는 {"title": string, "startDate": "YYYY-MM-DD", "endDate": "YYYY-MM-DD", "status": "ready"|"on-going"|"done", "importance": "high"|"medium"|"low", "effortValue": number, "effortUnit": "MH"|"MD", "description": string, "confidence": number}
 규칙:
 - 날짜가 적혀 있으면 그 날짜를 사용합니다. 같은 날짜 아래에 여러 줄이 있으면 각각 별도 항목으로 두고 같은 startDate와 endDate를 씁니다.
-- 날짜가 전혀 없으면 startDate와 endDate를 모두 "${todayStr}"로 합니다.
+- 날짜가 전혀 없으면 startDate/endDate는 빈 문자열로 둡니다.
 - 한 줄에 날짜와 제목이 같이 있으면 그 날짜에 그 제목을 넣습니다.
-- status는 기본 ready. 완료·체크 표시가 있으면 done, 진행중 표시가 있으면 on-going.
-- importance는 특별히 없으면 medium.
+- status는 판별 가능할 때만 채우고 애매하면 빈 문자열.
+- importance는 판별 가능할 때만 채우고 애매하면 빈 문자열.
+- effortValue/effortUnit은 적혀 있을 때만 채우고 없으면 effortValue는 null(또는 빈값), effortUnit은 "MH".
 - description은 부가 메모가 있을 때만 채우고 없으면 빈 문자열.
 - confidence는 해당 항목 인식 신뢰도(0~1 또는 0~100 숫자)로 넣습니다.
 - JSON 배열만 출력하고 다른 설명은 쓰지 마세요.`;
@@ -1631,6 +1644,7 @@
           <div class="ocr-draft-meta">
             <label>상태
               <select class="ocr-draft-status" data-index="${index}">
+                <option value="">(빈칸)</option>
                 <option value="ready">ready</option>
                 <option value="on-going">on-going</option>
                 <option value="done">done</option>
@@ -1638,9 +1652,19 @@
             </label>
             <label>중요도
               <select class="ocr-draft-imp" data-index="${index}">
+                <option value="">(빈칸)</option>
                 <option value="high">상</option>
                 <option value="medium">중</option>
                 <option value="low">하</option>
+              </select>
+            </label>
+            <label>공수
+              <input type="number" class="ocr-draft-effort" data-index="${index}" min="0" step="0.25" placeholder="빈칸 가능" />
+            </label>
+            <label>단위
+              <select class="ocr-draft-effort-unit" data-index="${index}">
+                <option value="MH">MH</option>
+                <option value="MD">MD</option>
               </select>
             </label>
           </div>
@@ -1652,12 +1676,16 @@
       const eEl = li.querySelector(".ocr-draft-end");
       const stEl = li.querySelector(".ocr-draft-status");
       const imEl = li.querySelector(".ocr-draft-imp");
+      const efEl = li.querySelector(".ocr-draft-effort");
+      const euEl = li.querySelector(".ocr-draft-effort-unit");
       const dEl = li.querySelector(".ocr-draft-desc");
       if (titleEl) titleEl.value = row.title || "";
       if (sEl) sEl.value = row.startDate || "";
       if (eEl) eEl.value = row.endDate || "";
-      if (stEl) stEl.value = row.status || "ready";
-      if (imEl) imEl.value = row.importance || "medium";
+      if (stEl) stEl.value = row.status || "";
+      if (imEl) imEl.value = row.importance || "";
+      if (efEl) efEl.value = row.effortValue != null && Number(row.effortValue) > 0 ? String(row.effortValue) : "";
+      if (euEl) euEl.value = row.effortUnit === "MD" ? "MD" : "MH";
       if (dEl) dEl.value = row.description || "";
     });
   }
@@ -1670,16 +1698,27 @@
       const e = /** @type {HTMLInputElement | null} */ (ocrDraftList.querySelector(`.ocr-draft-end[data-index="${index}"]`));
       const st = /** @type {HTMLSelectElement | null} */ (ocrDraftList.querySelector(`.ocr-draft-status[data-index="${index}"]`));
       const im = /** @type {HTMLSelectElement | null} */ (ocrDraftList.querySelector(`.ocr-draft-imp[data-index="${index}"]`));
+      const ef = /** @type {HTMLInputElement | null} */ (ocrDraftList.querySelector(`.ocr-draft-effort[data-index="${index}"]`));
+      const eu = /** @type {HTMLSelectElement | null} */ (ocrDraftList.querySelector(`.ocr-draft-effort-unit[data-index="${index}"]`));
       const d = /** @type {HTMLTextAreaElement | null} */ (ocrDraftList.querySelector(`.ocr-draft-desc[data-index="${index}"]`));
       const cb = /** @type {HTMLInputElement | null} */ (ocrDraftList.querySelector(`.ocr-draft-cb[data-index="${index}"]`));
       if (!cb || !cb.checked) return;
+      const effortRaw = ef && ef.value.trim() !== "" ? Number(ef.value) : NaN;
+      const effortValue = Number.isFinite(effortRaw) && effortRaw > 0 ? Math.round(effortRaw * 100) / 100 : null;
+      const effortUnit = eu && eu.value === "MD" ? "MD" : "MH";
+      const startDraft = s && s.value ? s.value : "";
+      const endDraft = e && e.value ? e.value : "";
+      const finalStart = startDraft || endDraft || toDateStrFromDate(new Date());
+      const finalEnd = endDraft || startDraft || finalStart;
       const payload = {
         title: (title && title.value.trim()) || "(제목 없음)",
-        startDate: s && s.value ? s.value : toDateStrFromDate(new Date()),
-        endDate: e && e.value ? e.value : s && s.value ? s.value : toDateStrFromDate(new Date()),
-        status: st ? st.value : "ready",
-        importance: im ? /** @type {'high'|'medium'|'low'} */ (im.value) : "medium",
+        startDate: finalStart,
+        endDate: finalEnd,
+        status: st && ["ready", "on-going", "done"].includes(st.value) ? st.value : "ready",
+        importance: im && ["high", "medium", "low"].includes(im.value) ? /** @type {'high'|'medium'|'low'} */ (im.value) : "medium",
         description: d ? d.value.trim() : "",
+        effortValue,
+        effortUnit,
         recurrence: /** @type {'none'} */ ("none"),
         recurrenceUntil: null,
       };
