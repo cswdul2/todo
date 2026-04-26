@@ -1514,15 +1514,47 @@
     throw new Error("JSON 배열 형식이 아닙니다.");
   }
 
+  /**
+   * OCR 날짜 문자열을 YYYY-MM-DD로 정규화한다.
+   * - YYYY-MM-DD
+   * - YYYY/M/D, YYYY.M.D
+   * - M-D, M/D, M.D, M월 D일  -> fallbackYear 사용
+   * @param {unknown} raw
+   * @param {number} fallbackYear
+   * @returns {string}
+   */
+  function normalizeOcrDate(raw, fallbackYear) {
+    if (typeof raw !== "string") return "";
+    const s = raw.trim();
+    if (!s) return "";
+    const ymd = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+    if (ymd) {
+      const y = Number(ymd[1]);
+      const m = Number(ymd[2]);
+      const d = Number(ymd[3]);
+      if (m < 1 || m > 12 || d < 1 || d > 31) return "";
+      return `${y}-${pad2(m)}-${pad2(d)}`;
+    }
+    const md = s.match(/^(\d{1,2})[-/.](\d{1,2})$/) || s.match(/^(\d{1,2})월\s*(\d{1,2})일$/);
+    if (md) {
+      const m = Number(md[1]);
+      const d = Number(md[2]);
+      if (m < 1 || m > 12 || d < 1 || d > 31) return "";
+      return `${fallbackYear}-${pad2(m)}-${pad2(d)}`;
+    }
+    return "";
+  }
+
   function coerceOcrItem(o, todayStr) {
     const title = o.title != null ? String(o.title).trim() : "";
-    let startDate = typeof o.startDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(o.startDate) ? o.startDate : "";
-    let endDate = typeof o.endDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(o.endDate) ? o.endDate : "";
+    const fallbackYear = viewYear || new Date().getFullYear();
+    let startDate = normalizeOcrDate(o.startDate, fallbackYear);
+    let endDate = normalizeOcrDate(o.endDate, fallbackYear);
     if (startDate && endDate && parseDateStr(startDate) > parseDateStr(endDate)) endDate = startDate;
-    const status = ["ready", "on-going", "done"].includes(o.status) ? o.status : "";
+    const status = ["ready", "on-going", "done"].includes(o.status) ? o.status : "ready";
     const importance = ["high", "medium", "low"].includes(o.importance) ? o.importance : "";
     const rawEffort = Number(o.effortValue);
-    const effortValue = Number.isFinite(rawEffort) && rawEffort > 0 ? Math.round(rawEffort * 100) / 100 : null;
+    const effortValue = Number.isFinite(rawEffort) && rawEffort > 0 ? Math.round(rawEffort * 100) / 100 : 2;
     const effortUnit = o.effortUnit === "MD" ? "MD" : "MH";
     const description = o.description != null ? String(o.description) : "";
     const rawC = Number(o.confidence);
@@ -1563,11 +1595,12 @@
 스키마: 각 원소는 {"title": string, "startDate": "YYYY-MM-DD", "endDate": "YYYY-MM-DD", "status": "ready"|"on-going"|"done", "importance": "high"|"medium"|"low", "effortValue": number, "effortUnit": "MH"|"MD", "description": string, "confidence": number}
 규칙:
 - 날짜가 적혀 있으면 그 날짜를 사용합니다. 같은 날짜 아래에 여러 줄이 있으면 각각 별도 항목으로 두고 같은 startDate와 endDate를 씁니다.
+- 연도가 없는 날짜(예: 5/4, 5월 4일)는 현재 달력 화면의 연도(${viewYear})를 붙여 YYYY-MM-DD로 만듭니다.
 - 날짜가 전혀 없으면 startDate/endDate는 빈 문자열로 둡니다.
 - 한 줄에 날짜와 제목이 같이 있으면 그 날짜에 그 제목을 넣습니다.
-- status는 판별 가능할 때만 채우고 애매하면 빈 문자열.
+- status는 판별 가능할 때 채우고, 애매하면 "ready"로 둡니다.
 - importance는 판별 가능할 때만 채우고 애매하면 빈 문자열.
-- effortValue/effortUnit은 적혀 있을 때만 채우고 없으면 effortValue는 null(또는 빈값), effortUnit은 "MH".
+- effortValue/effortUnit은 적혀 있을 때 채우고, 없으면 effortValue는 2, effortUnit은 "MH"로 둡니다.
 - description은 부가 메모가 있을 때만 채우고 없으면 빈 문자열.
 - confidence는 해당 항목 인식 신뢰도(0~1 또는 0~100 숫자)로 넣습니다.
 - JSON 배열만 출력하고 다른 설명은 쓰지 마세요.`;
@@ -2141,6 +2174,14 @@
         tasks.push(...newTasks);
         for (const t of newTasks) {
           await firebaseCreateTask(t);
+        }
+        const first = newTasks[0];
+        if (first && first.startDate) {
+          const anchor = parseDateStr(first.startDate);
+          if (!Number.isNaN(anchor.getTime())) {
+            viewYear = anchor.getFullYear();
+            viewMonth = anchor.getMonth();
+          }
         }
         renderCalendar();
         ocrStatus.textContent = `저장 완료: ${newTasks.length}건`;
