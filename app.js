@@ -663,7 +663,7 @@
     const LINE_STEP = BAR_HEIGHT + BAR_GAP;
     const TRACK_TOP_FRAC = 0.32;
     const HEADER_BASE_PX = 28; // 날짜/공휴일 텍스트 영역 최소 확보
-    const HEADER_EXTRA_PX = 2; // 시인성 확보용 추가 간격(항상 적용)
+    const HEADER_EXTRA_PX = 4; // 날짜/배지와 수평바 간 최소 간격
     /** @type {Record<number, number>} */
     const rowSlots = {};
     /** @type {Map<number, Map<string, Set<number>>>} row별 날짜별 lane 점유 */
@@ -673,6 +673,19 @@
 
     const allCells = [...calendarGrid.querySelectorAll(".calendar-cell[data-date-str]")];
     const cellByDate = new Map(allCells.map((cell) => [cell.dataset.dateStr || "", cell]));
+
+    /**
+     * 해당 셀에서 날짜 텍스트/공수 배지 하단을 피하도록 바 기준 Y 오프셋 계산
+     * @param {HTMLElement} cell
+     */
+    const headerClearance = (cell) => {
+      const numEl = /** @type {HTMLElement | null} */ (cell.querySelector(".calendar-cell__num"));
+      const badgeEl = /** @type {HTMLElement | null} */ (cell.querySelector(".calendar-cell__ongoing-count"));
+      const numBottom = numEl ? numEl.offsetTop + numEl.offsetHeight : 0;
+      const badgeBottom = badgeEl && !badgeEl.hidden ? badgeEl.offsetTop + badgeEl.offsetHeight : 0;
+      const contentBottom = Math.max(numBottom, badgeBottom);
+      return Math.max(cell.offsetHeight * TRACK_TOP_FRAC, HEADER_BASE_PX, contentBottom + HEADER_EXTRA_PX);
+    };
 
     // 멀티데이 일정은 가로로 이어서 표시
     tasks.forEach((task) => {
@@ -731,8 +744,13 @@
           const impKey = task.importance === "high" ? "high" : task.importance === "low" ? "low" : "medium";
           const impToken = "■ ";
           const stKey = task.status === "on-going" ? "ongoing" : task.status === "done" ? "done" : "ready";
-          const headerTop = Math.max(r1.height * TRACK_TOP_FRAC, HEADER_BASE_PX);
-          const baseTop = Math.round(r1.top + headerTop + HEADER_EXTRA_PX);
+          const runHeader = Math.max(
+            ...dateRun.map((ds) => {
+              const c = cellByDate.get(ds);
+              return c ? headerClearance(c) : headerClearance(firstCell);
+            })
+          );
+          const baseTop = Math.round(r1.top + runHeader);
           const line = document.createElement("div");
           line.className = "calendar-range-line";
           line.style.background = rangeLineColorForTask(task, endStr);
@@ -778,8 +796,7 @@
         width: cell.offsetWidth,
         height: cell.offsetHeight,
       };
-      const headerTop = Math.max(r.height * TRACK_TOP_FRAC, HEADER_BASE_PX);
-      const baseTop = Math.round(r.top + headerTop + HEADER_EXTRA_PX);
+      const baseTop = Math.round(r.top + headerClearance(cell));
       singleDay.forEach((t) => {
         const lane = cellLaneMap.get(ds) || 0;
         cellLaneMap.set(ds, lane + 1);
@@ -2098,18 +2115,26 @@
         btnOcrRun.disabled = false;
       }
     });
-    btnOcrApply.addEventListener("click", () => {
+    btnOcrApply.addEventListener("click", async () => {
       const payloads = readOcrDraftFromDom();
       if (!payloads.length) {
         alert("추가할 항목을 하나 이상 선택해 주세요.");
         return;
       }
-      payloads.forEach((p) => {
-        tasks.push(normalizeTask({ id: uuid(), ...p }));
-      });
-      saveTasks();
-      renderCalendar();
-      closeOcrModal();
+      const newTasks = payloads.map((p) => normalizeTask({ id: uuid(), ...p }));
+      try {
+        tasks.push(...newTasks);
+        if (firebaseDb && firebaseTasksRef) {
+          await Promise.all(newTasks.map((t) => firebaseCreateTask(t)));
+        } else {
+          saveTasks();
+        }
+        renderCalendar();
+        closeOcrModal();
+      } catch (e) {
+        console.error("OCR apply failed:", e);
+        alert("달력 저장 중 오류가 발생했습니다. Firebase 연결/권한을 확인해 주세요.");
+      }
     });
   }
 
