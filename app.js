@@ -506,14 +506,11 @@
     metaRef.update({ connectedAt: new Date().toISOString() }).catch(() => {});
   }
 
-  function saveTasks() {
-    if (!firebaseDb || !firebaseTasksRef) return;
+  async function saveTasks() {
+    if (!firebaseDb || !firebaseTasksRef) throw new Error("Firebase not connected");
     const payload = toFirebaseTasksMap(tasks);
-    firebaseTasksRef.set(payload).catch((err) => console.error("Firebase save error:", err));
-    firebaseDb
-      .ref(FIREBASE_META_PATH)
-      .update({ updatedAt: new Date().toISOString() })
-      .catch(() => {});
+    await firebaseTasksRef.set(payload);
+    await firebaseDb.ref(FIREBASE_META_PATH).update({ updatedAt: new Date().toISOString() });
   }
 
   function toFirebaseTask(t) {
@@ -527,6 +524,8 @@
       endDate: t.endDate,
       recurrence: t.recurrence || "none",
       recurrenceUntil: t.recurrenceUntil || null,
+      effortValue: Number.isFinite(Number(t.effortValue)) && Number(t.effortValue) > 0 ? Number(t.effortValue) : null,
+      effortUnit: t.effortUnit === "MD" ? "MD" : "MH",
       updatedAt: new Date().toISOString(),
     };
   }
@@ -662,8 +661,8 @@
     const BAR_GAP = 3;
     const LINE_STEP = BAR_HEIGHT + BAR_GAP;
     const TRACK_TOP_FRAC = 0.32;
-    const HEADER_BASE_PX = 28; // 날짜/공휴일 텍스트 영역 최소 확보
-    const HEADER_EXTRA_PX = 4; // 날짜/배지와 수평바 간 최소 간격
+    const HEADER_BASE_PX = 36; // 날짜/공휴일/배지 아래 최소 시작 높이
+    const HEADER_EXTRA_PX = 8; // 날짜/배지와 수평바 간 최소 간격
     /** @type {Record<number, number>} */
     const rowSlots = {};
     /** @type {Map<number, Map<string, Set<number>>>} row별 날짜별 lane 점유 */
@@ -931,7 +930,9 @@
     taskRecurrenceUntil.value = modalSessionSnapshot.form.recurrenceUntil;
     toggleRecurrenceFields();
     btnDelete.hidden = !editingId;
-    saveTasks();
+    saveTasks().catch((err) => {
+      console.error("restore snapshot save error:", err);
+    });
     applyModalTheme();
     renderExistingTasksList();
     renderCalendar();
@@ -2014,7 +2015,7 @@
         });
         if (!ok) return;
         tasks = incoming.map(normalizeTask);
-        saveTasks();
+        await saveTasks();
         renderCalendar();
         updateSearchResults();
         alert(`가져오기 완료: ${tasks.length}건`);
@@ -2124,11 +2125,7 @@
       const newTasks = payloads.map((p) => normalizeTask({ id: uuid(), ...p }));
       try {
         tasks.push(...newTasks);
-        if (firebaseDb && firebaseTasksRef) {
-          await Promise.all(newTasks.map((t) => firebaseCreateTask(t)));
-        } else {
-          saveTasks();
-        }
+        await saveTasks();
         renderCalendar();
         closeOcrModal();
       } catch (e) {
