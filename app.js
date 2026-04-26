@@ -2123,14 +2123,24 @@
         return;
       }
       const newTasks = payloads.map((p) => normalizeTask({ id: uuid(), ...p }));
+      const prevTasks = tasks.slice();
       try {
         tasks.push(...newTasks);
-        await saveTasks();
+        if (firebaseDb && firebaseTasksRef) {
+          for (const t of newTasks) {
+            await firebaseCreateTask(t);
+          }
+        } else {
+          throw new Error("Firebase 연결이 아직 준비되지 않았습니다.");
+        }
         renderCalendar();
         closeOcrModal();
       } catch (e) {
+        tasks = prevTasks;
+        renderCalendar();
         console.error("OCR apply failed:", e);
-        alert("달력 저장 중 오류가 발생했습니다. Firebase 연결/권한을 확인해 주세요.");
+        const msg = e instanceof Error ? e.message : String(e);
+        alert("달력 저장 중 오류가 발생했습니다: " + msg);
       }
     });
   }
