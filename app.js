@@ -389,7 +389,7 @@
 
   function statusBarColor(status) {
     if (status === "on-going") return "#e8943a";
-    if (status === "done") return "repeating-linear-gradient(135deg, #9ca3af 0 3px, #d1d5db 3px 6px)";
+    if (status === "done") return "repeating-linear-gradient(135deg, #94a3b8 0 1px, #e5e7eb 1px 3px)";
     return "#8b95a5";
   }
 
@@ -657,30 +657,33 @@
       case "on-going":
         return "#e8943a";
       case "done":
-        return "repeating-linear-gradient(135deg, #9ca3af 0 3px, #d1d5db 3px 6px)";
+        return "repeating-linear-gradient(135deg, #94a3b8 0 1px, #e5e7eb 1px 3px)";
       default:
         return "#8b95a5";
     }
   }
 
-  function renderMultiDayRangeLines() {
+  function renderMultiDayRangeLines(finalPass = false) {
     const layer = document.getElementById("calendarRangeLayer");
     if (!layer || !calendarGrid) return;
     layer.innerHTML = "";
     const layerRect = layer.getBoundingClientRect();
     if (layerRect.width < 1 || layerRect.height < 1) return;
     const BAR_HEIGHT = 6;
-    const BAR_GAP = 3;
+    const BAR_GAP = 4;
     const LINE_STEP = BAR_HEIGHT + BAR_GAP;
-    const TRACK_TOP_FRAC = 0.32;
-    const HEADER_BASE_PX = 36; // 날짜/공휴일/배지 아래 최소 시작 높이
-    const HEADER_EXTRA_PX = 8; // 날짜/배지와 수평바 간 최소 간격
+    const HEADER_BASE_PX = 24; // 날짜/공휴일/배지 아래 최소 시작 높이
+    const HEADER_EXTRA_PX = 6; // 날짜/배지와 수평바 간 최소 간격
     /** @type {Record<number, number>} */
     const rowSlots = {};
     /** @type {Map<number, Map<string, Set<number>>>} row별 날짜별 lane 점유 */
     const rowDayLaneUsage = new Map();
     /** @type {Map<string, number>} 날짜별 실제 점유 라인 수 */
     const cellLaneMap = new Map();
+    /** @type {Map<string, number>} 날짜별 실제 그려진 바의 최대 하단 절대좌표 */
+    const dateBarBottomAbsMap = new Map();
+    /** @type {Record<number, number>} row별 공통 바 시작 오프셋 */
+    const rowBaseTop = {};
 
     const allCells = [...calendarGrid.querySelectorAll(".calendar-cell[data-date-str]")];
     const cellByDate = new Map(allCells.map((cell) => [cell.dataset.dateStr || "", cell]));
@@ -691,12 +694,23 @@
      */
     const headerClearance = (cell) => {
       const numEl = /** @type {HTMLElement | null} */ (cell.querySelector(".calendar-cell__num"));
+      const holidayEl = /** @type {HTMLElement | null} */ (cell.querySelector(".calendar-cell__holiday-name"));
       const badgeEl = /** @type {HTMLElement | null} */ (cell.querySelector(".calendar-cell__ongoing-count"));
       const numBottom = numEl ? numEl.offsetTop + numEl.offsetHeight : 0;
+      const holidayBottom = holidayEl ? holidayEl.offsetTop + holidayEl.offsetHeight : 0;
       const badgeBottom = badgeEl && !badgeEl.hidden ? badgeEl.offsetTop + badgeEl.offsetHeight : 0;
-      const contentBottom = Math.max(numBottom, badgeBottom);
-      return Math.max(cell.offsetHeight * TRACK_TOP_FRAC, HEADER_BASE_PX, contentBottom + HEADER_EXTRA_PX);
+      const contentBottom = Math.max(numBottom, holidayBottom, badgeBottom);
+      // 셀 높이에 비례해 시작점을 내리면(예: cellHeight * 0.32),
+      // 행이 커질수록 바도 같이 아래로 밀려 dot 영역 침범이 반복된다.
+      // 따라서 시작점은 "헤더 콘텐츠 하단 + 여유"를 기준으로만 잡는다.
+      return Math.max(HEADER_BASE_PX, contentBottom + HEADER_EXTRA_PX);
     };
+
+    allCells.forEach((cell, idx) => {
+      const row = Math.floor(idx / 7);
+      const clr = headerClearance(cell);
+      rowBaseTop[row] = Math.max(rowBaseTop[row] || 0, clr);
+    });
 
     // 멀티데이 일정은 가로로 이어서 표시
     tasks.forEach((task) => {
@@ -755,13 +769,8 @@
           const impKey = task.importance === "high" ? "high" : task.importance === "low" ? "low" : "medium";
           const impToken = "■ ";
           const stKey = task.status === "on-going" ? "ongoing" : task.status === "done" ? "done" : "ready";
-          const runHeader = Math.max(
-            ...dateRun.map((ds) => {
-              const c = cellByDate.get(ds);
-              return c ? headerClearance(c) : headerClearance(firstCell);
-            })
-          );
-          const baseTop = Math.round(r1.top + runHeader);
+          const rowBase = rowBaseTop[row] || HEADER_BASE_PX;
+          const lineTop = Math.round(r1.top + rowBase + lane * LINE_STEP);
           const line = document.createElement("div");
           line.className = "calendar-range-line";
           line.style.background = rangeLineColorForTask(task, endStr);
@@ -781,9 +790,14 @@
             openModal(firstDs, task.id);
           });
           line.style.left = Math.round(r1.left) + "px";
-          line.style.top = baseTop + lane * LINE_STEP + "px";
+          line.style.top = lineTop + "px";
           line.style.width = r2.right - r1.left + "px";
           layer.appendChild(line);
+          const lineBottomAbs = lineTop + BAR_HEIGHT;
+          dateRun.forEach((ds) => {
+            const prevBottom = dateBarBottomAbsMap.get(ds) || -Infinity;
+            if (lineBottomAbs > prevBottom) dateBarBottomAbsMap.set(ds, lineBottomAbs);
+          });
         });
       });
     });
@@ -807,7 +821,8 @@
         width: cell.offsetWidth,
         height: cell.offsetHeight,
       };
-      const baseTop = Math.round(r.top + headerClearance(cell));
+      const rowBase = rowBaseTop[row] || HEADER_BASE_PX;
+      const baseTop = Math.round(r.top + rowBase);
       singleDay.forEach((t) => {
         const lane = cellLaneMap.get(ds) || 0;
         cellLaneMap.set(ds, lane + 1);
@@ -837,6 +852,9 @@
         line.style.top = baseTop + lane * LINE_STEP + "px";
         line.style.width = Math.round(r.width) + "px";
         layer.appendChild(line);
+        const lineBottomAbs = r.top + rowBase + lane * LINE_STEP + BAR_HEIGHT;
+        const prevBottom = dateBarBottomAbsMap.get(ds) || -Infinity;
+        if (lineBottomAbs > prevBottom) dateBarBottomAbsMap.set(ds, lineBottomAbs);
       });
     });
 
@@ -849,14 +867,42 @@
       const row = Math.floor(idx / 7);
       rowLaneMax[row] = Math.max(rowLaneMax[row] || 0, lanes);
     });
-    applyCalendarRowHeights(rowSlots, rowLaneMax);
+    if (!finalPass) {
+      /** @type {Record<number, number>} */
+      const rowOverflowPx = {};
+      allCells.forEach((cell, idx) => {
+        const ds = cell.dataset.dateStr || "";
+        if (!ds) return;
+        const barBottomAbs = dateBarBottomAbsMap.get(ds);
+        if (barBottomAbs == null) return;
+        const row = Math.floor(idx / 7);
+        const dotsEl = /** @type {HTMLElement | null} */ (cell.querySelector(".calendar-cell__dots"));
+        // dot 영역 침범 방지를 위해 안전 경계를 더 위로(엄격하게) 잡는다.
+        const safeBottomAbs = cell.offsetTop + (dotsEl ? dotsEl.offsetTop : cell.offsetHeight) - 10;
+        const overflow = Math.ceil(barBottomAbs - safeBottomAbs);
+        if (overflow > 0) rowOverflowPx[row] = Math.max(rowOverflowPx[row] || 0, overflow);
+      });
+      applyCalendarRowHeights(rowSlots, rowLaneMax, cellLaneMap, rowOverflowPx, rowBaseTop, LINE_STEP, BAR_HEIGHT);
+      // 행 높이 적용 후 셀 좌표가 바뀌므로 한 번 더 재렌더링해 정렬을 확정한다.
+      requestAnimationFrame(() => renderMultiDayRangeLines(true));
+      return;
+    }
+    // final pass에서는 확정된 레이아웃 기준으로 그린 결과만 유지
   }
 
   /**
    * 일정 밀도에 따라 해당 주의 행 높이를 늘린다.
    * @param {Record<number, number>} rowSlots
    */
-  function applyCalendarRowHeights(rowSlots, rowLaneMax = {}) {
+  function applyCalendarRowHeights(
+    rowSlots,
+    rowLaneMax = {},
+    cellLaneMap = new Map(),
+    rowOverflowPx = {},
+    rowBaseTop = {},
+    lineStep = 10,
+    barHeight = 6
+  ) {
     if (!calendarGrid) return;
     const cells = [...calendarGrid.querySelectorAll(".calendar-cell[data-date-str]")];
     const rowCount = Math.ceil(cells.length / 7);
@@ -866,17 +912,43 @@
     for (let row = 0; row < rowCount; row++) {
       const inRow = cells.slice(row * 7, row * 7 + 7);
       let maxTasks = 0;
+      let rowRequiredHeight = 0;
+      let maxDotsHeight = 0;
       inRow.forEach((cell) => {
         const ds = cell.dataset.dateStr;
         if (!ds) return;
         const c = tasks.filter((t) => taskCoversDate(t, ds)).length;
         if (c > maxTasks) maxTasks = c;
+
+        // 셀별 실제 헤더 하단(날짜 숫자/공휴일명/우측 배지)을 측정해
+        // 수평바 스택 + 하단 dot 영역 보호 높이를 계산한다.
+        const numEl = /** @type {HTMLElement | null} */ (cell.querySelector(".calendar-cell__num"));
+        const holidayEl = /** @type {HTMLElement | null} */ (cell.querySelector(".calendar-cell__holiday-name"));
+        const badgeEl = /** @type {HTMLElement | null} */ (cell.querySelector(".calendar-cell__ongoing-count"));
+        const numBottom = numEl ? numEl.offsetTop + numEl.offsetHeight : 0;
+        const holidayBottom = holidayEl ? holidayEl.offsetTop + holidayEl.offsetHeight : 0;
+        const badgeBottom = badgeEl && !badgeEl.hidden ? badgeEl.offsetTop + badgeEl.offsetHeight : 0;
+        const contentBottom = Math.max(numBottom, holidayBottom, badgeBottom);
+
+        const lanes = cellLaneMap.get(ds) || 0;
+        const laneStackHeight = lanes > 0 ? barHeight + (lanes - 1) * lineStep : 0;
+        const dotsEl = /** @type {HTMLElement | null} */ (cell.querySelector(".calendar-cell__dots"));
+        const dotsHeight = dotsEl ? Math.max(0, dotsEl.offsetHeight) : 0;
+        if (dotsHeight > maxDotsHeight) maxDotsHeight = dotsHeight;
+        const headerGap = 7;
+        // 날짜별 dot 개수(1줄/2줄/3줄)에 따라 실제 하단 보호 높이를 반영한다.
+        const dotSafe = Math.max(20, dotsHeight + 14);
+        const cellRequired = contentBottom + headerGap + laneStackHeight + dotSafe;
+        if (cellRequired > rowRequiredHeight) rowRequiredHeight = cellRequired;
       });
-      const taskExtra = Math.max(0, maxTasks - 4) * 6;
       const lanes = Math.max(rowSlots[row] || 0, rowLaneMax[row] || 0);
-      // renderMultiDayRangeLines 의 LINE_STEP(=6px bar + 3px gap)과 동기화
-      const lineExtra = Math.max(0, lanes - 3) * 9;
-      const h = Math.min(180, 88 + taskExtra + lineExtra);
+      const rowBase = rowBaseTop[row] || 0;
+      const laneStackBottom = rowBase + (lanes > 0 ? (lanes - 1) * lineStep + barHeight : 0);
+      const dotsBlock = Math.max(20, maxDotsHeight);
+      // 동그라미는 "마지막 수평바 아래"에 오도록 강제: [bar bottom] + 8px + [dots] + 10px
+      const strictRowHeight = laneStackBottom + 8 + dotsBlock + 10;
+      const taskExtra = Math.max(0, maxTasks - 4) * 6;
+      const h = Math.max(108, 92 + taskExtra, strictRowHeight, rowRequiredHeight) + (rowOverflowPx[row] || 0);
       rows.push(`${h}px`);
     }
     calendarGrid.style.gridTemplateRows = rows.join(" ");
@@ -1107,12 +1179,12 @@
     return s;
   }
 
-  function buildDailyMhBadgeTooltip(dayEffortRows, remainingDailyMh, totalDailyMh) {
+  function buildDailyMhBadgeTooltip(dayEffortRows, spentDailyMh, totalDailyMh) {
     if (!dayEffortRows.length) return "";
     const maxLines = 15;
     const lines = dayEffortRows.map((x) => `${taskLabel(x.task)} (${formatMh(x.dailyMh)}MH)`);
     const shown = lines.slice(0, maxLines);
-    let tip = `당일 공수 ${formatMh(remainingDailyMh)}/${formatMh(totalDailyMh)}MH (남은/전체)`;
+    let tip = `당일 공수 ${formatMh(spentDailyMh)}/${formatMh(totalDailyMh)}MH (투입/예상)`;
     tip += "\n────────\n";
     tip += shown.map((lab, i) => `${i + 1}. ${lab}`).join("\n");
     if (lines.length > maxLines) tip += `\n… 외 ${lines.length - maxLines}건`;
@@ -1129,16 +1201,17 @@
     const remainingEffortRows = allEffortRows.filter((x) => x.task.status !== "done");
     const remainingDailyMh = remainingEffortRows.reduce((acc, x) => acc + x.dailyMh, 0);
     const totalDailyMh = allEffortRows.reduce((acc, x) => acc + x.dailyMh, 0);
+    const spentDailyMh = Math.max(0, totalDailyMh - remainingDailyMh);
     const ongoingEl = cell.querySelector(".calendar-cell__ongoing-count");
     if (ongoingEl) {
       if (totalDailyMh > 0) {
-        ongoingEl.textContent = `${formatMh(remainingDailyMh)}/${formatMh(totalDailyMh)}`;
+        ongoingEl.textContent = `${formatMh(spentDailyMh)}/${formatMh(totalDailyMh)}`;
         ongoingEl.hidden = false;
         ongoingEl.classList.toggle("calendar-cell__ongoing-count--complete", remainingDailyMh <= 0.0001);
-        ongoingEl.title = buildDailyMhBadgeTooltip(allEffortRows, remainingDailyMh, totalDailyMh);
+        ongoingEl.title = buildDailyMhBadgeTooltip(allEffortRows, spentDailyMh, totalDailyMh);
         ongoingEl.setAttribute(
           "aria-label",
-          `${dateStr} 당일 공수 ${formatMh(remainingDailyMh)}/${formatMh(totalDailyMh)}MH (남은/전체): ${allEffortRows.map((x) => taskLabel(x.task)).join(", ")}`
+          `${dateStr} 당일 공수 ${formatMh(spentDailyMh)}/${formatMh(totalDailyMh)}MH (투입/예상): ${allEffortRows.map((x) => taskLabel(x.task)).join(", ")}`
         );
       } else {
         ongoingEl.textContent = "";
@@ -2192,9 +2265,11 @@
         btnOcrApply.disabled = true;
         await waitForFirebaseReady();
         tasks.push(...newTasks);
-        for (const t of newTasks) {
-          await firebaseCreateTask(t);
-        }
+        await saveTasks();
+        const snap = await firebaseTasksRef.once("value");
+        const v = snap.val();
+        const list = v && typeof v === "object" ? Object.values(v) : [];
+        tasks = list.map(normalizeTask);
         const first = newTasks[0];
         if (first && first.startDate) {
           const anchor = parseDateStr(first.startDate);
