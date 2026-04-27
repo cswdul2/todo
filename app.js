@@ -121,6 +121,7 @@
   let geminiKeyCache = "";
   let firebaseDb = null;
   let firebaseTasksRef = null;
+  let barDotLayoutFixAttempts = 0;
   /** @type {null | { tasks: Task[], selectedDateStr: string | null, editingId: string | null, modalDefaultWhite: boolean, form: { title: string, description: string, effortValue: string, effortUnit: string, startDate: string, endDate: string, recurrence: 'none'|'daily'|'weekly'|'monthly', recurrenceUntil: string } }} */
   let modalSessionSnapshot = null;
 
@@ -687,6 +688,7 @@
 
     const allCells = [...calendarGrid.querySelectorAll(".calendar-cell[data-date-str]")];
     const cellByDate = new Map(allCells.map((cell) => [cell.dataset.dateStr || "", cell]));
+    if (!finalPass) barDotLayoutFixAttempts = 0;
 
     /**
      * 해당 셀에서 날짜 텍스트/공수 배지 하단을 피하도록 바 기준 Y 오프셋 계산
@@ -877,15 +879,69 @@
         if (barBottomAbs == null) return;
         const row = Math.floor(idx / 7);
         const dotsEl = /** @type {HTMLElement | null} */ (cell.querySelector(".calendar-cell__dots"));
-        // dot 영역 침범 방지를 위해 안전 경계를 더 위로(엄격하게) 잡는다.
-        const safeBottomAbs = cell.offsetTop + (dotsEl ? dotsEl.offsetTop : cell.offsetHeight) - 10;
-        const overflow = Math.ceil(barBottomAbs - safeBottomAbs);
+        // 근본식:
+        // [마지막 바 하단 + 3px] <= [동그라미 시작]
+        // 동그라미 시작은 셀 높이와 함께 이동하므로, 현재 셀에서
+        // bottomReserve = (cellHeight - dotsTop) 를 추출해 필요한 최소 높이를 역산한다.
+        const dotsTop = dotsEl ? dotsEl.offsetTop : cell.offsetHeight;
+        const bottomReserve = Math.max(0, cell.offsetHeight - dotsTop);
+        const barBottomRel = barBottomAbs - cell.offsetTop;
+        const requiredHeight = barBottomRel + 3 + bottomReserve;
+        const overflow = Math.ceil(requiredHeight - cell.offsetHeight);
         if (overflow > 0) rowOverflowPx[row] = Math.max(rowOverflowPx[row] || 0, overflow);
       });
       applyCalendarRowHeights(rowSlots, rowLaneMax, cellLaneMap, rowOverflowPx, rowBaseTop, LINE_STEP, BAR_HEIGHT);
       // 행 높이 적용 후 셀 좌표가 바뀌므로 한 번 더 재렌더링해 정렬을 확정한다.
       requestAnimationFrame(() => renderMultiDayRangeLines(true));
       return;
+    }
+    // final pass에서도 실제 DOM 좌표 기준으로
+    // [마지막 바 하단 + 3px <= 동그라미 시작] 불변식을 검사/보정한다.
+    if (barDotLayoutFixAttempts < 3) {
+      /** @type {Record<number, number>} */
+      const overlapByRow = {};
+      const lines = [...layer.querySelectorAll(".calendar-range-line")];
+      allCells.forEach((cell, idx) => {
+        const row = Math.floor(idx / 7);
+        const dotsEl = /** @type {HTMLElement | null} */ (cell.querySelector(".calendar-cell__dots"));
+        if (!dotsEl) return;
+        const dotsTop = dotsEl.offsetTop;
+        const cellTop = cell.offsetTop;
+        const cellBottom = cell.offsetTop + cell.offsetHeight;
+        const cellLeft = cell.offsetLeft;
+        const cellRight = cell.offsetLeft + cell.offsetWidth;
+        let maxBottomInCell = -Infinity;
+        lines.forEach((line) => {
+          const lineTop = line.offsetTop;
+          const lineBottom = line.offsetTop + BAR_HEIGHT;
+          const lineLeft = line.offsetLeft;
+          const lineRight = line.offsetLeft + line.offsetWidth;
+          // 같은 행(세로 교차) + 같은 날짜 칸(x 교차)인 라인만 검사
+          if (lineBottom <= cellTop || lineTop >= cellBottom) return;
+          if (lineRight <= cellLeft || lineLeft >= cellRight) return;
+          const relBottom = lineBottom - cellTop;
+          if (relBottom > maxBottomInCell) maxBottomInCell = relBottom;
+        });
+        if (!Number.isFinite(maxBottomInCell)) return;
+        const overlap = Math.ceil(maxBottomInCell + 3 - dotsTop);
+        if (overlap > 0) overlapByRow[row] = Math.max(overlapByRow[row] || 0, overlap);
+      });
+
+      if (Object.keys(overlapByRow).length > 0) {
+        const currentRows = getComputedStyle(calendarGrid).gridTemplateRows
+          .split(" ")
+          .map((x) => parseFloat(x) || 0);
+        const rowCount = Math.ceil(allCells.length / 7);
+        const nextRows = [];
+        for (let row = 0; row < rowCount; row++) {
+          const base = currentRows[row] || 0;
+          nextRows.push(`${base + (overlapByRow[row] || 0) + 2}px`);
+        }
+        calendarGrid.style.gridTemplateRows = nextRows.join(" ");
+        barDotLayoutFixAttempts += 1;
+        requestAnimationFrame(() => renderMultiDayRangeLines(true));
+        return;
+      }
     }
     // final pass에서는 확정된 레이아웃 기준으로 그린 결과만 유지
   }
@@ -945,8 +1001,9 @@
       const rowBase = rowBaseTop[row] || 0;
       const laneStackBottom = rowBase + (lanes > 0 ? (lanes - 1) * lineStep + barHeight : 0);
       const dotsBlock = Math.max(20, maxDotsHeight);
-      // 동그라미는 "마지막 수평바 아래"에 오도록 강제: [bar bottom] + 8px + [dots] + 10px
-      const strictRowHeight = laneStackBottom + 8 + dotsBlock + 10;
+      // 동그라미는 "마지막 수평바 하단 + 3px" 아래에서 시작해야 한다.
+      // flex 레이아웃/패딩/브라우저 렌더 오차를 감안해 하단 여유를 넉넉히 확보한다.
+      const strictRowHeight = laneStackBottom + 3 + dotsBlock + 22;
       const taskExtra = Math.max(0, maxTasks - 4) * 6;
       const h = Math.max(108, 92 + taskExtra, strictRowHeight, rowRequiredHeight) + (rowOverflowPx[row] || 0);
       rows.push(`${h}px`);
