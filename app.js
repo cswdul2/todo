@@ -135,6 +135,8 @@
   let lastPointerClientY = -1;
   /** @type {null | { tasks: Task[], selectedDateStr: string | null, editingId: string | null, modalDefaultWhite: boolean, form: { title: string, description: string, effortValue: string, effortUnit: string, startDate: string, endDate: string, recurrence: 'none'|'daily'|'weekly'|'monthly', recurrenceUntil: string } }} */
   let modalSessionSnapshot = null;
+  // 이전 실행에서 남아있을 수 있는 커스텀 툴팁 노드 정리
+  document.querySelectorAll(".range-line-tooltip").forEach((el) => el.remove());
 
   function pad2(n) {
     return String(n).padStart(2, "0");
@@ -217,10 +219,14 @@
         (e) => {
           lastPointerClientX = e.clientX;
           lastPointerClientY = e.clientY;
-          if (!rangeTooltipEl || rangeTooltipEl.hidden || !rangeTooltipAnchorEl) return;
           const target = /** @type {Element | null} */ (e.target instanceof Element ? e.target : null);
           const hoveredLine = target ? target.closest(".calendar-range-line") : null;
-          // 요구사항: 포인터가 수평바 영역에 있을 때만 툴팁 표시.
+          // 요구사항: 수평바 영역 밖이면 마지막 툴팁 포함 전부 즉시 제거
+          if (!hoveredLine) {
+            hideRangeTooltipNow();
+            return;
+          }
+          if (!rangeTooltipEl || rangeTooltipEl.hidden || !rangeTooltipAnchorEl) return;
           if (hoveredLine !== rangeTooltipAnchorEl) hideRangeTooltipNow();
         },
         true
@@ -275,6 +281,7 @@
     pointerY = null,
     autoHideIfNotHoveredMs = 0
   ) {
+    if (!anchorEl || !anchorEl.matches(":hover")) return;
     const tip = ensureRangeTooltip();
     if (rangeTooltipHideTimer) {
       clearTimeout(rangeTooltipHideTimer);
@@ -346,6 +353,10 @@
         showTimer = null;
       }
       showTimer = setTimeout(() => {
+        if (!lineEl.matches(":hover")) {
+          showTimer = null;
+          return;
+        }
         showRangeTooltip(lineEl, text, statusKey, impKey, onActivate, lastX, lastY, autoHideIfNotHoveredMs);
         showTimer = null;
       }, Math.max(0, showDelayMs));
@@ -1009,19 +1020,26 @@
           line.dataset.tipBody = `${taskLabel(task)}`;
           line.classList.add(`calendar-range-line--tip-${stKey}`, `calendar-range-line--tip-imp-${impKey}`);
           line.tabIndex = 0;
+          const updateTipAnchorPos = (e) => {
+            if (!(e instanceof MouseEvent)) return;
+            const rr = line.getBoundingClientRect();
+            const x = Math.max(0, Math.min(rr.width, e.clientX - rr.left));
+            const y = Math.max(0, Math.min(rr.height, e.clientY - rr.top));
+            line.style.setProperty("--tip-x", `${Math.round(x)}px`);
+            line.style.setProperty("--tip-y", `${Math.round(y)}px`);
+          };
+          line.addEventListener("mouseenter", updateTipAnchorPos);
+          line.addEventListener("mousemove", updateTipAnchorPos);
           const openFromLine = () => openModal(firstDs, task.id);
-          bindRangeLineTooltip(line, taskLabel(task), stKey, impKey, openFromLine, true, 100, 0);
           line.addEventListener("click", (e) => {
             e.preventDefault();
             e.stopPropagation();
-            hideRangeTooltipNow();
             openFromLine();
           });
           line.addEventListener("keydown", (e) => {
             if (e.key !== "Enter" && e.key !== " ") return;
             e.preventDefault();
             e.stopPropagation();
-            hideRangeTooltipNow();
             openFromLine();
           });
           line.style.left = Math.round(r1.left) + "px";
@@ -1072,19 +1090,26 @@
         line.dataset.tipBody = `${taskLabel(t)}`;
         line.classList.add(`calendar-range-line--tip-${stKey}`, `calendar-range-line--tip-imp-${impKey}`);
         line.tabIndex = 0;
+        const updateTipAnchorPos = (e) => {
+          if (!(e instanceof MouseEvent)) return;
+          const rr = line.getBoundingClientRect();
+          const x = Math.max(0, Math.min(rr.width, e.clientX - rr.left));
+          const y = Math.max(0, Math.min(rr.height, e.clientY - rr.top));
+          line.style.setProperty("--tip-x", `${Math.round(x)}px`);
+          line.style.setProperty("--tip-y", `${Math.round(y)}px`);
+        };
+        line.addEventListener("mouseenter", updateTipAnchorPos);
+        line.addEventListener("mousemove", updateTipAnchorPos);
         const openFromLine = () => openModal(ds, t.id);
-        bindRangeLineTooltip(line, taskLabel(t), stKey, impKey, openFromLine, true, 100, 0);
         line.addEventListener("click", (e) => {
           e.preventDefault();
           e.stopPropagation();
-          hideRangeTooltipNow();
           openFromLine();
         });
         line.addEventListener("keydown", (e) => {
           if (e.key !== "Enter" && e.key !== " ") return;
           e.preventDefault();
           e.stopPropagation();
-          hideRangeTooltipNow();
           openFromLine();
         });
         line.style.left = Math.round(r.left) + "px";
@@ -1394,7 +1419,7 @@
         const num = cell.querySelector(".calendar-cell__num");
         if (num) num.insertAdjacentHTML("beforeend", ` <span class="calendar-cell__holiday-name">${escapeHtml(holidayName)}</span>`);
       }
-      cell.addEventListener("click", () => openModal(cell.dataset.dateStr));
+      cell.addEventListener("click", () => openModal(cell.dataset.dateStr, null, true));
       styleCellForDate(cell, cell.dataset.dateStr);
       calendarGrid.appendChild(cell);
     }
@@ -1427,7 +1452,7 @@
         const num = cell.querySelector(".calendar-cell__num");
         if (num) num.insertAdjacentHTML("beforeend", ` <span class="calendar-cell__holiday-name">${escapeHtml(holidayName)}</span>`);
       }
-      cell.addEventListener("click", () => openModal(ds));
+      cell.addEventListener("click", () => openModal(ds, null, true));
       styleCellForDate(cell, ds);
       calendarGrid.appendChild(cell);
     }
@@ -1449,7 +1474,7 @@
         const num = cell.querySelector(".calendar-cell__num");
         if (num) num.insertAdjacentHTML("beforeend", ` <span class="calendar-cell__holiday-name">${escapeHtml(holidayName)}</span>`);
       }
-      cell.addEventListener("click", () => openModal(cell.dataset.dateStr));
+      cell.addEventListener("click", () => openModal(cell.dataset.dateStr, null, true));
       styleCellForDate(cell, cell.dataset.dateStr);
       calendarGrid.appendChild(cell);
     }
@@ -1545,6 +1570,19 @@
         wrap.dataset.tipBody = `${taskLabel(t)}`;
         wrap.classList.add(`calendar-cell__dot-wrap--tip-${stKey}`, `calendar-cell__dot-wrap--tip-imp-${impKey}`);
         wrap.tabIndex = 0;
+        const updateDotTipAnchorPos = (e) => {
+          if (!(e instanceof MouseEvent)) return;
+          const rr = wrap.getBoundingClientRect();
+          const x = Math.max(0, Math.min(rr.width, e.clientX - rr.left));
+          const y = Math.max(0, Math.min(rr.height, e.clientY - rr.top));
+          wrap.style.setProperty("--tip-x", `${Math.round(x)}px`);
+          wrap.style.setProperty("--tip-y", `${Math.round(y)}px`);
+        };
+        wrap.addEventListener("mouseenter", updateDotTipAnchorPos);
+        wrap.addEventListener("mousemove", updateDotTipAnchorPos);
+        wrap.addEventListener("mouseleave", () => {
+          hideRangeTooltipNow();
+        });
         const openFromDot = () => openModal(dateStr, t.id);
         // 동그라미는 커스텀 플로팅 툴팁을 쓰지 않는다.
         // (수평바 툴팁 잔류/재트리거와 충돌 방지)
@@ -1552,14 +1590,12 @@
         wrap.addEventListener("click", (e) => {
           e.preventDefault();
           e.stopPropagation();
-          hideRangeTooltipNow();
           openFromDot();
         });
         wrap.addEventListener("keydown", (e) => {
           if (e.key !== "Enter" && e.key !== " ") return;
           e.preventDefault();
           e.stopPropagation();
-          hideRangeTooltipNow();
           openFromDot();
         });
         const inner = document.createElement("span");
@@ -1590,7 +1626,7 @@
     }
   }
 
-  function openModal(dateStr, taskId) {
+  function openModal(dateStr, taskId, forceNew = false) {
     selectedDateStr = dateStr;
     editingId = taskId || null;
     modalDefaultWhite = !taskId;
@@ -1617,6 +1653,18 @@
         draftImportance = t.importance || "medium";
       }
     } else {
+      if (forceNew) {
+        draftStatus = "ready";
+        draftImportance = "medium";
+        taskTitle.value = "";
+        taskDescription.value = "";
+        taskEffortValue.value = "";
+        taskEffortUnit.value = "MH";
+        taskStart.value = dateStr;
+        taskEnd.value = dateStr;
+        taskRecurrence.value = "none";
+        taskRecurrenceUntil.value = "";
+      } else {
       // 해당 날짜에 일정이 있으면 첫 항목을 기본 선택(날짜 변경 즉시 편집 가능)
       const onDay = tasks
         .filter((t) => taskCoversDate(t, dateStr))
@@ -1643,6 +1691,7 @@
         taskEnd.value = dateStr;
         taskRecurrence.value = "none";
         taskRecurrenceUntil.value = "";
+      }
       }
     }
 
