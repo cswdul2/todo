@@ -399,6 +399,11 @@ body {
   opacity: 0.95;
   pointer-events: auto;
   z-index: 10;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.62) inset,
+    0 -1px 0 rgba(15, 23, 42, 0.16) inset,
+    0 1px 2px rgba(15, 23, 42, 0.22);
+  transition: transform 120ms ease, box-shadow 140ms ease, opacity 120ms ease;
 }
 
 .calendar-cell__dot-wrap,
@@ -413,6 +418,16 @@ body {
 .calendar-range-line[data-tip-body]:hover,
 .calendar-range-line[data-tip-body]:focus {
   z-index: 500;
+}
+
+.calendar-range-line:hover,
+.calendar-range-line:focus {
+  transform: translateY(-1px) scaleY(1.08);
+  opacity: 1;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.7) inset,
+    0 -1px 0 rgba(15, 23, 42, 0.22) inset,
+    0 3px 7px rgba(15, 23, 42, 0.26);
 }
 
 .calendar-grid {
@@ -695,6 +710,11 @@ body {
 /* 바깥: 중요도(회색 링, 크기) · 안쪽: 진행 상태 색 */
 .calendar-cell__dot-wrap {
   position: relative;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  appearance: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -705,31 +725,22 @@ body {
   flex-shrink: 0;
 }
 
-.calendar-cell__dot-wrap[data-tip-body]:hover::before,
-.calendar-cell__dot-wrap[data-tip-body]:hover::after,
-.calendar-cell__dot-wrap[data-tip-body]:focus::before,
-.calendar-cell__dot-wrap[data-tip-body]:focus::after,
 .calendar-cell__task-bar[data-tip-body]:hover::before,
 .calendar-cell__task-bar[data-tip-body]:hover::after,
 .calendar-cell__task-bar[data-tip-body]:focus::before,
-.calendar-cell__task-bar[data-tip-body]:focus::after,
-.calendar-range-line[data-tip-body]:hover::before,
-.calendar-range-line[data-tip-body]:hover::after,
-.calendar-range-line[data-tip-body]:focus::before,
-.calendar-range-line[data-tip-body]:focus::after {
+.calendar-cell__task-bar[data-tip-body]:focus::after {
   position: absolute;
   top: 50%;
-  transform: translateY(-50%);
+  transform: translateY(-50%) translateX(-4px) scale(0.94);
+  transform-origin: left center;
   z-index: 5000;
   pointer-events: none;
+  animation: tip-pop 140ms cubic-bezier(0.2, 0.8, 0.25, 1) forwards;
+  will-change: transform, box-shadow, opacity;
 }
 
-.calendar-cell__dot-wrap[data-tip-body]:hover::before,
-.calendar-cell__dot-wrap[data-tip-body]:focus::before,
 .calendar-cell__task-bar[data-tip-body]:hover::before,
-.calendar-cell__task-bar[data-tip-body]:focus::before,
-.calendar-range-line[data-tip-body]:hover::before,
-.calendar-range-line[data-tip-body]:focus::before {
+.calendar-cell__task-bar[data-tip-body]:focus::before {
   content: "";
   display: block;
   left: calc(100% + 20px);
@@ -741,12 +752,8 @@ body {
   z-index: 5002;
 }
 
-.calendar-cell__dot-wrap[data-tip-body]:hover::after,
-.calendar-cell__dot-wrap[data-tip-body]:focus::after,
 .calendar-cell__task-bar[data-tip-body]:hover::after,
-.calendar-cell__task-bar[data-tip-body]:focus::after,
-.calendar-range-line[data-tip-body]:hover::after,
-.calendar-range-line[data-tip-body]:focus::after {
+.calendar-cell__task-bar[data-tip-body]:focus::after {
   content: attr(data-tip-body);
   left: calc(100% + 12px);
   top: 50%;
@@ -758,37 +765,39 @@ body {
   border: 1px solid #cbd5e1;
   border-radius: 7px;
   padding: 0.22rem 0.4rem 0.22rem 2.35rem;
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.16);
+  box-shadow:
+    0 12px 26px rgba(15, 23, 42, 0.24),
+    0 2px 0 rgba(255, 255, 255, 0.78) inset,
+    0 -1px 0 rgba(148, 163, 184, 0.18) inset;
 }
 
-.calendar-cell__dot-wrap--tip-ready[data-tip-body]:hover::after,
-.calendar-cell__dot-wrap--tip-ready[data-tip-body]:focus::after,
+@keyframes tip-pop {
+  0% {
+    opacity: 0.74;
+    transform: translateY(-50%) translateX(-5px) scale(0.92);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0) scale(1);
+  }
+}
+
 .calendar-cell__task-bar--tip-ready[data-tip-body]:hover::after,
-.calendar-cell__task-bar--tip-ready[data-tip-body]:focus::after,
-.calendar-range-line--tip-ready[data-tip-body]:hover::after,
-.calendar-range-line--tip-ready[data-tip-body]:focus::after {
+.calendar-cell__task-bar--tip-ready[data-tip-body]:focus::after {
   background: #eef2f7;
   border-color: #aeb8c5;
   color: #334155;
 }
 
-.calendar-cell__dot-wrap--tip-ongoing[data-tip-body]:hover::after,
-.calendar-cell__dot-wrap--tip-ongoing[data-tip-body]:focus::after,
 .calendar-cell__task-bar--tip-ongoing[data-tip-body]:hover::after,
-.calendar-cell__task-bar--tip-ongoing[data-tip-body]:focus::after,
-.calendar-range-line--tip-ongoing[data-tip-body]:hover::after,
-.calendar-range-line--tip-ongoing[data-tip-body]:focus::after {
+.calendar-cell__task-bar--tip-ongoing[data-tip-body]:focus::after {
   background: #fff4e8;
   border-color: #e8943a;
   color: #7a5230;
 }
 
-.calendar-cell__dot-wrap--tip-done[data-tip-body]:hover::after,
-.calendar-cell__dot-wrap--tip-done[data-tip-body]:focus::after,
 .calendar-cell__task-bar--tip-done[data-tip-body]:hover::after,
-.calendar-cell__task-bar--tip-done[data-tip-body]:focus::after,
-.calendar-range-line--tip-done[data-tip-body]:hover::after,
-.calendar-range-line--tip-done[data-tip-body]:focus::after {
+.calendar-cell__task-bar--tip-done[data-tip-body]:focus::after {
   background: #e8f5ec;
   border-color: #5cb88a;
   color: #276749;
@@ -797,30 +806,90 @@ body {
   text-decoration-color: rgba(39, 103, 73, 0.85);
 }
 
-.calendar-cell__dot-wrap--tip-imp-high[data-tip-body]:hover::before,
-.calendar-cell__dot-wrap--tip-imp-high[data-tip-body]:focus::before,
 .calendar-cell__task-bar--tip-imp-high[data-tip-body]:hover::before,
-.calendar-cell__task-bar--tip-imp-high[data-tip-body]:focus::before,
-.calendar-range-line--tip-imp-high[data-tip-body]:hover::before,
-.calendar-range-line--tip-imp-high[data-tip-body]:focus::before {
+.calendar-cell__task-bar--tip-imp-high[data-tip-body]:focus::before {
   background: #ef4444;
 }
 
-.calendar-cell__dot-wrap--tip-imp-medium[data-tip-body]:hover::before,
-.calendar-cell__dot-wrap--tip-imp-medium[data-tip-body]:focus::before,
 .calendar-cell__task-bar--tip-imp-medium[data-tip-body]:hover::before,
-.calendar-cell__task-bar--tip-imp-medium[data-tip-body]:focus::before,
-.calendar-range-line--tip-imp-medium[data-tip-body]:hover::before,
-.calendar-range-line--tip-imp-medium[data-tip-body]:focus::before {
+.calendar-cell__task-bar--tip-imp-medium[data-tip-body]:focus::before {
   background: #f59e0b;
 }
 
-.calendar-cell__dot-wrap--tip-imp-low[data-tip-body]:hover::before,
-.calendar-cell__dot-wrap--tip-imp-low[data-tip-body]:focus::before,
 .calendar-cell__task-bar--tip-imp-low[data-tip-body]:hover::before,
-.calendar-cell__task-bar--tip-imp-low[data-tip-body]:focus::before,
-.calendar-range-line--tip-imp-low[data-tip-body]:hover::before,
-.calendar-range-line--tip-imp-low[data-tip-body]:focus::before {
+.calendar-cell__task-bar--tip-imp-low[data-tip-body]:focus::before {
+  background: #2563eb;
+}
+
+.range-line-tooltip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 5100;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+  white-space: nowrap;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #0f172a;
+  background: #fff7ed;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  padding: 0.24rem 0.45rem;
+  box-shadow:
+    0 12px 26px rgba(15, 23, 42, 0.24),
+    0 2px 0 rgba(255, 255, 255, 0.78) inset,
+    0 -1px 0 rgba(148, 163, 184, 0.18) inset;
+  transform: translateY(-50%);
+  cursor: default;
+  user-select: none;
+  pointer-events: none;
+  transition: box-shadow 120ms ease, transform 120ms ease, filter 120ms ease;
+}
+
+.range-line-tooltip__imp {
+  width: 0.52rem;
+  height: 0.52rem;
+  border-radius: 2px;
+  background: #94a3b8;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.12);
+}
+
+.range-line-tooltip--pop {
+  animation: tip-pop 140ms cubic-bezier(0.2, 0.8, 0.25, 1) forwards;
+}
+
+.range-line-tooltip--ready {
+  background: #eef2f7;
+  border-color: #aeb8c5;
+  color: #334155;
+}
+
+.range-line-tooltip--ongoing {
+  background: #fff4e8;
+  border-color: #e8943a;
+  color: #7a5230;
+}
+
+.range-line-tooltip--done {
+  background: #e8f5ec;
+  border-color: #5cb88a;
+  color: #276749;
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+  text-decoration-color: rgba(39, 103, 73, 0.85);
+}
+
+.range-line-tooltip--imp-high .range-line-tooltip__imp {
+  background: #ef4444;
+}
+
+.range-line-tooltip--imp-medium .range-line-tooltip__imp {
+  background: #f59e0b;
+}
+
+.range-line-tooltip--imp-low .range-line-tooltip__imp {
   background: #2563eb;
 }
 

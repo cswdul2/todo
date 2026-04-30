@@ -122,6 +122,17 @@
   let firebaseDb = null;
   let firebaseTasksRef = null;
   let barDotLayoutFixAttempts = 0;
+  let rangeTooltipEl = null;
+  let rangeTooltipHideTimer = null;
+  let rangeTooltipAutoHideTimer = null;
+  let rangeTooltipWatchTimer = null;
+  let rangeTooltipOpenHandler = null;
+  let rangeTooltipAnchorEl = null;
+  let rangeTooltipHovering = false;
+  let rangeTooltipTransitUntil = 0;
+  let rangeTooltipGlobalGuardBound = false;
+  let lastPointerClientX = -1;
+  let lastPointerClientY = -1;
   /** @type {null | { tasks: Task[], selectedDateStr: string | null, editingId: string | null, modalDefaultWhite: boolean, form: { title: string, description: string, effortValue: string, effortUnit: string, startDate: string, endDate: string, recurrence: 'none'|'daily'|'weekly'|'monthly', recurrenceUntil: string } }} */
   let modalSessionSnapshot = null;
 
@@ -149,6 +160,224 @@
 
   function todayStart() {
     return startOfDay(new Date());
+  }
+
+  function ensureRangeTooltip() {
+    // 핫리로드/스크립트 재실행 등으로 남은 오래된 툴팁 노드를 정리
+    const stale = document.querySelectorAll(".range-line-tooltip");
+    if (stale.length > 1) {
+      stale.forEach((el, idx) => {
+        if (!(el instanceof HTMLElement)) return;
+        if (idx === stale.length - 1) return;
+        el.remove();
+      });
+    }
+    if (rangeTooltipEl && document.body.contains(rangeTooltipEl)) return rangeTooltipEl;
+    const existing = document.querySelector(".range-line-tooltip");
+    if (existing instanceof HTMLElement) {
+      rangeTooltipEl = existing;
+      return rangeTooltipEl;
+    }
+    const tip = document.createElement("div");
+    tip.className = "range-line-tooltip";
+    tip.hidden = true;
+    tip.tabIndex = 0;
+    tip.innerHTML = `<span class="range-line-tooltip__imp" aria-hidden="true"></span><span class="range-line-tooltip__text"></span>`;
+    tip.addEventListener("mouseenter", () => {
+      rangeTooltipHovering = true;
+      if (rangeTooltipHideTimer) {
+        clearTimeout(rangeTooltipHideTimer);
+        rangeTooltipHideTimer = null;
+      }
+      tip.classList.add("range-line-tooltip--pop");
+    });
+    tip.addEventListener("mouseleave", (e) => {
+      rangeTooltipHovering = false;
+      const next = /** @type {Element | null} */ (e.relatedTarget instanceof Element ? e.relatedTarget : null);
+      if (rangeTooltipAnchorEl && next && rangeTooltipAnchorEl.contains(next)) return;
+      hideRangeTooltipNow();
+    });
+    tip.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (typeof rangeTooltipOpenHandler === "function") rangeTooltipOpenHandler();
+      hideRangeTooltipNow();
+    });
+    tip.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      e.preventDefault();
+      if (typeof rangeTooltipOpenHandler === "function") rangeTooltipOpenHandler();
+      hideRangeTooltipNow();
+    });
+    document.body.appendChild(tip);
+    rangeTooltipEl = tip;
+    if (!rangeTooltipGlobalGuardBound) {
+      document.addEventListener(
+        "mousemove",
+        (e) => {
+          lastPointerClientX = e.clientX;
+          lastPointerClientY = e.clientY;
+          if (!rangeTooltipEl || rangeTooltipEl.hidden || !rangeTooltipAnchorEl) return;
+          const target = /** @type {Element | null} */ (e.target instanceof Element ? e.target : null);
+          const hoveredLine = target ? target.closest(".calendar-range-line") : null;
+          // 요구사항: 포인터가 수평바 영역에 있을 때만 툴팁 표시.
+          if (hoveredLine !== rangeTooltipAnchorEl) hideRangeTooltipNow();
+        },
+        true
+      );
+      rangeTooltipGlobalGuardBound = true;
+    }
+    return tip;
+  }
+
+  function hideRangeTooltipNow() {
+    document.querySelectorAll(".range-line-tooltip").forEach((el) => {
+      if (!(el instanceof HTMLElement)) return;
+      el.hidden = true;
+      el.classList.remove("range-line-tooltip--pop");
+    });
+    if (!rangeTooltipEl) return;
+    if (rangeTooltipHideTimer) {
+      clearTimeout(rangeTooltipHideTimer);
+      rangeTooltipHideTimer = null;
+    }
+    if (rangeTooltipAutoHideTimer) {
+      clearTimeout(rangeTooltipAutoHideTimer);
+      rangeTooltipAutoHideTimer = null;
+    }
+    if (rangeTooltipWatchTimer) {
+      clearInterval(rangeTooltipWatchTimer);
+      rangeTooltipWatchTimer = null;
+    }
+    rangeTooltipEl.hidden = true;
+    rangeTooltipEl.classList.remove("range-line-tooltip--pop");
+    rangeTooltipAnchorEl = null;
+    rangeTooltipOpenHandler = null;
+    rangeTooltipHovering = false;
+  }
+
+  function scheduleRangeTooltipHide(delayMs = 120) {
+    if (rangeTooltipHideTimer) clearTimeout(rangeTooltipHideTimer);
+    rangeTooltipTransitUntil = Date.now() + Math.max(220, delayMs + 120);
+    rangeTooltipHideTimer = setTimeout(() => {
+      hideRangeTooltipNow();
+      rangeTooltipHideTimer = null;
+    }, delayMs);
+  }
+
+  function showRangeTooltip(
+    anchorEl,
+    text,
+    statusKey,
+    impKey,
+    onActivate,
+    pointerX = null,
+    pointerY = null,
+    autoHideIfNotHoveredMs = 0
+  ) {
+    const tip = ensureRangeTooltip();
+    if (rangeTooltipHideTimer) {
+      clearTimeout(rangeTooltipHideTimer);
+      rangeTooltipHideTimer = null;
+    }
+    if (rangeTooltipAutoHideTimer) {
+      clearTimeout(rangeTooltipAutoHideTimer);
+      rangeTooltipAutoHideTimer = null;
+    }
+    rangeTooltipOpenHandler = onActivate;
+    rangeTooltipAnchorEl = anchorEl;
+    rangeTooltipHovering = false;
+    tip.className = "range-line-tooltip";
+    tip.classList.add("range-line-tooltip--pop", `range-line-tooltip--${statusKey}`, `range-line-tooltip--imp-${impKey}`);
+    const textEl = tip.querySelector(".range-line-tooltip__text");
+    if (textEl) textEl.textContent = text || "";
+    tip.hidden = false;
+    if (pointerX != null && pointerY != null) {
+      tip.style.left = `${Math.round(window.scrollX + pointerX + 10)}px`;
+      tip.style.top = `${Math.round(window.scrollY + pointerY)}px`;
+    } else {
+      const r = anchorEl.getBoundingClientRect();
+      tip.style.left = `${Math.round(window.scrollX + r.right + 10)}px`;
+      tip.style.top = `${Math.round(window.scrollY + r.top + r.height / 2)}px`;
+    }
+    if (autoHideIfNotHoveredMs > 0) {
+      rangeTooltipAutoHideTimer = setTimeout(() => {
+        if (!rangeTooltipHovering) hideRangeTooltipNow();
+        rangeTooltipAutoHideTimer = null;
+      }, autoHideIfNotHoveredMs);
+    }
+    if (rangeTooltipWatchTimer) {
+      clearInterval(rangeTooltipWatchTimer);
+      rangeTooltipWatchTimer = null;
+    }
+    // 이벤트 누락과 무관하게 "수평바를 벗어나면 즉시 숨김"을 강제한다.
+    rangeTooltipWatchTimer = setInterval(() => {
+      if (!rangeTooltipEl || rangeTooltipEl.hidden || !rangeTooltipAnchorEl) return;
+      if (!rangeTooltipAnchorEl.matches(":hover")) {
+        hideRangeTooltipNow();
+        return;
+      }
+      const r = rangeTooltipAnchorEl.getBoundingClientRect();
+      const insideByCoords =
+        lastPointerClientX >= r.left &&
+        lastPointerClientX <= r.right &&
+        lastPointerClientY >= r.top &&
+        lastPointerClientY <= r.bottom;
+      if (!insideByCoords) hideRangeTooltipNow();
+    }, 50);
+  }
+
+  function bindRangeLineTooltip(
+    lineEl,
+    text,
+    statusKey,
+    impKey,
+    onActivate,
+    hideImmediatelyOnLeave = false,
+    showDelayMs = 0,
+    autoHideIfNotHoveredMs = 0
+  ) {
+    let showTimer = null;
+    let lastX = null;
+    let lastY = null;
+    const scheduleShow = () => {
+      if (showTimer) {
+        clearTimeout(showTimer);
+        showTimer = null;
+      }
+      showTimer = setTimeout(() => {
+        showRangeTooltip(lineEl, text, statusKey, impKey, onActivate, lastX, lastY, autoHideIfNotHoveredMs);
+        showTimer = null;
+      }, Math.max(0, showDelayMs));
+    };
+    lineEl.addEventListener("mouseenter", (e) => {
+      const mx = e instanceof MouseEvent ? e.clientX : null;
+      const my = e instanceof MouseEvent ? e.clientY : null;
+      lastX = mx;
+      lastY = my;
+      scheduleShow();
+    });
+    lineEl.addEventListener("mousemove", (e) => {
+      const mx = e instanceof MouseEvent ? e.clientX : null;
+      const my = e instanceof MouseEvent ? e.clientY : null;
+      lastX = mx;
+      lastY = my;
+      scheduleShow();
+    });
+    lineEl.addEventListener("mouseleave", () => {
+      if (showTimer) {
+        clearTimeout(showTimer);
+        showTimer = null;
+      }
+      // 요구사항: 수평바 영역을 벗어나면 즉시 숨김
+      hideRangeTooltipNow();
+    });
+    lineEl.addEventListener("focus", () => {
+      showRangeTooltip(lineEl, text, statusKey, impKey, onActivate, null, null, autoHideIfNotHoveredMs);
+    });
+    lineEl.addEventListener("blur", () => {
+      scheduleRangeTooltipHide();
+    });
   }
 
   function addDaysStr(dateStr, delta) {
@@ -780,16 +1009,20 @@
           line.dataset.tipBody = `${taskLabel(task)}`;
           line.classList.add(`calendar-range-line--tip-${stKey}`, `calendar-range-line--tip-imp-${impKey}`);
           line.tabIndex = 0;
+          const openFromLine = () => openModal(firstDs, task.id);
+          bindRangeLineTooltip(line, taskLabel(task), stKey, impKey, openFromLine, true, 100, 0);
           line.addEventListener("click", (e) => {
             e.preventDefault();
             e.stopPropagation();
-            openModal(firstDs, task.id);
+            hideRangeTooltipNow();
+            openFromLine();
           });
           line.addEventListener("keydown", (e) => {
             if (e.key !== "Enter" && e.key !== " ") return;
             e.preventDefault();
             e.stopPropagation();
-            openModal(firstDs, task.id);
+            hideRangeTooltipNow();
+            openFromLine();
           });
           line.style.left = Math.round(r1.left) + "px";
           line.style.top = lineTop + "px";
@@ -839,16 +1072,20 @@
         line.dataset.tipBody = `${taskLabel(t)}`;
         line.classList.add(`calendar-range-line--tip-${stKey}`, `calendar-range-line--tip-imp-${impKey}`);
         line.tabIndex = 0;
+        const openFromLine = () => openModal(ds, t.id);
+        bindRangeLineTooltip(line, taskLabel(t), stKey, impKey, openFromLine, true, 100, 0);
         line.addEventListener("click", (e) => {
           e.preventDefault();
           e.stopPropagation();
-          openModal(ds, t.id);
+          hideRangeTooltipNow();
+          openFromLine();
         });
         line.addEventListener("keydown", (e) => {
           if (e.key !== "Enter" && e.key !== " ") return;
           e.preventDefault();
           e.stopPropagation();
-          openModal(ds, t.id);
+          hideRangeTooltipNow();
+          openFromLine();
         });
         line.style.left = Math.round(r.left) + "px";
         line.style.top = baseTop + lane * LINE_STEP + "px";
@@ -1298,7 +1535,8 @@
     if (dots && list.length) {
       const sorted = getVisibleTasksForCalendarDay(dateStr);
       sorted.forEach((t) => {
-        const wrap = document.createElement("span");
+        const wrap = document.createElement("button");
+        wrap.type = "button";
         wrap.className = importanceWrapClass(t.importance || "medium");
         const impKey = t.importance === "high" ? "high" : t.importance === "low" ? "low" : "medium";
         const impToken = "■ ";
@@ -1307,17 +1545,22 @@
         wrap.dataset.tipBody = `${taskLabel(t)}`;
         wrap.classList.add(`calendar-cell__dot-wrap--tip-${stKey}`, `calendar-cell__dot-wrap--tip-imp-${impKey}`);
         wrap.tabIndex = 0;
+        const openFromDot = () => openModal(dateStr, t.id);
+        // 동그라미는 커스텀 플로팅 툴팁을 쓰지 않는다.
+        // (수평바 툴팁 잔류/재트리거와 충돌 방지)
         // 동그라미 클릭 시 해당 task를 바로 편집 모드로 연다.
         wrap.addEventListener("click", (e) => {
           e.preventDefault();
           e.stopPropagation();
-          openModal(dateStr, t.id);
+          hideRangeTooltipNow();
+          openFromDot();
         });
         wrap.addEventListener("keydown", (e) => {
           if (e.key !== "Enter" && e.key !== " ") return;
           e.preventDefault();
           e.stopPropagation();
-          openModal(dateStr, t.id);
+          hideRangeTooltipNow();
+          openFromDot();
         });
         const inner = document.createElement("span");
         inner.className = "calendar-cell__dot-inner " + statusDotClass(t.status);
