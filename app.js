@@ -21,6 +21,10 @@
 
   /** @type {Task[]} */
   let tasks = [];
+  /** @type {Task[][]} */
+  let undoStack = [];
+  /** @type {Task[][]} */
+  let redoStack = [];
 
   let viewYear = new Date().getFullYear();
   let viewMonth = new Date().getMonth();
@@ -133,6 +137,8 @@
   let rangeTooltipGlobalGuardBound = false;
   let lastPointerClientX = -1;
   let lastPointerClientY = -1;
+  let suppressRangeClickTaskId = null;
+  let suppressRangeClickUntil = 0;
   /** @type {null | { tasks: Task[], selectedDateStr: string | null, editingId: string | null, modalDefaultWhite: boolean, form: { title: string, description: string, effortValue: string, effortUnit: string, startDate: string, endDate: string, recurrence: 'none'|'daily'|'weekly'|'monthly', recurrenceUntil: string } }} */
   let modalSessionSnapshot = null;
   // 이전 실행에서 남아있을 수 있는 커스텀 툴팁 노드 정리
@@ -395,6 +401,135 @@
     const d = parseDateStr(dateStr);
     d.setDate(d.getDate() + delta);
     return toDateStrFromDate(d);
+  }
+
+  function diffDaysStr(fromDateStr, toDateStrValue) {
+    const a = parseDateStr(fromDateStr).getTime();
+    const b = parseDateStr(toDateStrValue).getTime();
+    return Math.round((b - a) / 86400000);
+  }
+
+  function dateStrFromPoint(clientX, clientY) {
+    if (!calendarGrid) return null;
+    const cells = [...calendarGrid.querySelectorAll(".calendar-cell[data-date-str]")];
+    for (const cell of cells) {
+      if (!(cell instanceof HTMLElement)) continue;
+      const r = cell.getBoundingClientRect();
+      const inside = clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom;
+      if (inside) return cell.dataset.dateStr || null;
+    }
+    // fallback: 좌표가 셀 경계선 위에 걸친 경우 보조 판정
+    const el = document.elementFromPoint(clientX, clientY);
+    if (!(el instanceof Element)) return null;
+    const cell = el.closest(".calendar-cell[data-date-str]");
+    if (!(cell instanceof HTMLElement)) return null;
+    return cell.dataset.dateStr || null;
+  }
+
+  function bindRangeDrag(lineEl, task, anchorDateStr) {
+    lineEl.addEventListener("pointerdown", (e) => {
+      if (!(e instanceof PointerEvent) || e.button !== 0) return;
+      e.preventDefault();
+      const startX = e.clientX;
+      const startY = e.clientY;
+      let moved = false;
+      let ghost = null;
+      const lineRect = lineEl.getBoundingClientRect();
+      const grabOffsetX = Math.max(0, Math.min(lineRect.width, e.clientX - lineRect.left));
+      const grabOffsetY = Math.max(0, Math.min(lineRect.height, e.clientY - lineRect.top));
+
+      const createGhost = () => {
+        if (ghost) return;
+        ghost = document.createElement("div");
+        ghost.className = "calendar-range-drag-ghost";
+        ghost.style.width = `${Math.max(22, Math.round(lineRect.width))}px`;
+        ghost.style.height = `${Math.max(6, Math.round(lineRect.height || 6))}px`;
+        ghost.style.background = lineEl.style.background || getComputedStyle(lineEl).background;
+        document.body.appendChild(ghost);
+      };
+
+      const placeGhost = (clientX, clientY) => {
+        if (!ghost) return;
+        ghost.style.left = `${Math.round(clientX - grabOffsetX)}px`;
+        ghost.style.top = `${Math.round(clientY - grabOffsetY)}px`;
+      };
+
+      const onMove = (ev) => {
+        if (!(ev instanceof PointerEvent)) return;
+        ev.preventDefault();
+        if (!moved && Math.hypot(ev.clientX - startX, ev.clientY - startY) >= 4) {
+          moved = true;
+          lineEl.classList.add("calendar-range-line--dragging");
+          createGhost();
+          document.body.classList.add("calendar-dragging");
+          lineEl.classList.add("calendar-range-line--drag-origin");
+        }
+        if (moved) {
+          placeGhost(ev.clientX, ev.clientY);
+        }
+      };
+
+      const cleanup = () => {
+        window.removeEventListener("pointermove", onMove, true);
+        window.removeEventListener("pointerup", onUp, true);
+        window.removeEventListener("pointercancel", onCancel, true);
+        lineEl.classList.remove("calendar-range-line--dragging");
+        lineEl.classList.remove("calendar-range-line--drag-origin");
+        document.body.classList.remove("calendar-dragging");
+        if (ghost) {
+          ghost.remove();
+          ghost = null;
+        }
+        try {
+          lineEl.releasePointerCapture(e.pointerId);
+        } catch {}
+      };
+
+      const finishMove = async (ev, cancelled) => {
+        cleanup();
+        if (cancelled || !moved) return;
+        const targetDateStr = dateStrFromPoint(ev.clientX, ev.clientY);
+        if (!targetDateStr) return;
+        const delta = diffDaysStr(anchorDateStr, targetDateStr);
+        if (!Number.isFinite(delta) || delta === 0) return;
+        pushUndoSnapshot();
+
+        // 드래그 드롭 직후 발생하는 click 이벤트를 먼저 억제한다.
+        suppressRangeClickTaskId = task.id;
+        suppressRangeClickUntil = Date.now() + 450;
+
+        const patch = {
+          startDate: addDaysStr(task.startDate, delta),
+          endDate: addDaysStr(task.endDate, delta),
+        };
+        if (task.recurrenceUntil) patch.recurrenceUntil = addDaysStr(task.recurrenceUntil, delta);
+
+        try {
+          await firebaseUpdateTask(task.id, patch);
+        } catch (err) {
+          const idx = tasks.findIndex((x) => x.id === task.id);
+          if (idx >= 0) Object.assign(tasks[idx], patch);
+          await saveTasks();
+        }
+        renderCalendar();
+      };
+
+      const onUp = (ev) => {
+        if (!(ev instanceof PointerEvent)) return;
+        void finishMove(ev, false);
+      };
+      const onCancel = (ev) => {
+        if (!(ev instanceof PointerEvent)) return;
+        void finishMove(ev, true);
+      };
+
+      window.addEventListener("pointermove", onMove, true);
+      window.addEventListener("pointerup", onUp, true);
+      window.addEventListener("pointercancel", onCancel, true);
+      try {
+        lineEl.setPointerCapture(e.pointerId);
+      } catch {}
+    });
   }
 
   function addMonthsStr(dateStr, delta) {
@@ -905,11 +1040,11 @@
   }
 
   function renderMultiDayRangeLines(finalPass = false) {
-    const layer = document.getElementById("calendarRangeLayer");
-    if (!layer || !calendarGrid) return;
-    layer.innerHTML = "";
-    const layerRect = layer.getBoundingClientRect();
-    if (layerRect.width < 1 || layerRect.height < 1) return;
+    if (!calendarGrid) return;
+    const layer = calendarGrid;
+    layer.querySelectorAll(".calendar-range-line").forEach((el) => el.remove());
+    const gridRect = calendarGrid.getBoundingClientRect();
+    if (gridRect.width < 1 || gridRect.height < 1) return;
     const BAR_HEIGHT = 6;
     const BAR_GAP = 4;
     const LINE_STEP = BAR_HEIGHT + BAR_GAP;
@@ -1031,9 +1166,11 @@
           line.addEventListener("mouseenter", updateTipAnchorPos);
           line.addEventListener("mousemove", updateTipAnchorPos);
           const openFromLine = () => openModal(firstDs, task.id);
+          bindRangeDrag(line, task, firstDs);
           line.addEventListener("click", (e) => {
             e.preventDefault();
             e.stopPropagation();
+            if (suppressRangeClickTaskId === task.id && Date.now() <= suppressRangeClickUntil) return;
             openFromLine();
           });
           line.addEventListener("keydown", (e) => {
@@ -1101,9 +1238,11 @@
         line.addEventListener("mouseenter", updateTipAnchorPos);
         line.addEventListener("mousemove", updateTipAnchorPos);
         const openFromLine = () => openModal(ds, t.id);
+        bindRangeDrag(line, t, ds);
         line.addEventListener("click", (e) => {
           e.preventDefault();
           e.stopPropagation();
+          if (suppressRangeClickTaskId === t.id && Date.now() <= suppressRangeClickUntil) return;
           openFromLine();
         });
         line.addEventListener("keydown", (e) => {
@@ -1159,7 +1298,7 @@
     }
     // final pass에서도 실제 DOM 좌표 기준으로
     // [마지막 바 하단 + 3px <= 동그라미 시작] 불변식을 검사/보정한다.
-    if (barDotLayoutFixAttempts < 3) {
+    if (barDotLayoutFixAttempts < 20) {
       /** @type {Record<number, number>} */
       const overlapByRow = {};
       const lines = [...layer.querySelectorAll(".calendar-range-line")];
@@ -1197,7 +1336,8 @@
         const nextRows = [];
         for (let row = 0; row < rowCount; row++) {
           const base = currentRows[row] || 0;
-          nextRows.push(`${base + (overlapByRow[row] || 0) + 2}px`);
+          // 드래그 후 바가 몰린 케이스에서 재침범을 막기 위해 버퍼를 크게 준다.
+          nextRows.push(`${base + (overlapByRow[row] || 0) + 20}px`);
         }
         calendarGrid.style.gridTemplateRows = nextRows.join(" ");
         barDotLayoutFixAttempts += 1;
@@ -1265,7 +1405,7 @@
       const dotsBlock = Math.max(20, maxDotsHeight);
       // 동그라미는 "마지막 수평바 하단 + 3px" 아래에서 시작해야 한다.
       // flex 레이아웃/패딩/브라우저 렌더 오차를 감안해 하단 여유를 넉넉히 확보한다.
-      const strictRowHeight = laneStackBottom + 3 + dotsBlock + 22;
+      const strictRowHeight = laneStackBottom + 3 + dotsBlock + 50;
       const taskExtra = Math.max(0, maxTasks - 4) * 6;
       const h = Math.max(108, 92 + taskExtra, strictRowHeight, rowRequiredHeight) + (rowOverflowPx[row] || 0);
       rows.push(`${h}px`);
@@ -1296,6 +1436,35 @@
 
   function cloneTasks(src) {
     return src.map((t) => ({ ...t }));
+  }
+
+  function pushUndoSnapshot() {
+    undoStack.push(cloneTasks(tasks));
+    if (undoStack.length > 100) undoStack.shift();
+    redoStack = [];
+  }
+
+  async function applyHistorySnapshot(snapshot) {
+    tasks = cloneTasks(snapshot);
+    await saveTasks();
+    renderCalendar();
+    updateSearchResults();
+  }
+
+  async function undoOnce() {
+    if (!undoStack.length) return;
+    redoStack.push(cloneTasks(tasks));
+    const prev = undoStack.pop();
+    if (!prev) return;
+    await applyHistorySnapshot(prev);
+  }
+
+  async function redoOnce() {
+    if (!redoStack.length) return;
+    undoStack.push(cloneTasks(tasks));
+    const next = redoStack.pop();
+    if (!next) return;
+    await applyHistorySnapshot(next);
   }
 
   function buildModalSnapshot() {
@@ -1788,6 +1957,7 @@
           e.stopPropagation();
           const i = tasks.findIndex((x) => x.id === t.id);
           if (i < 0) return;
+          pushUndoSnapshot();
           tasks[i] = { ...tasks[i], status: st };
           if (editingId === t.id) modalDefaultWhite = false;
           await firebaseUpdateTask(t.id, { status: st });
@@ -1815,6 +1985,7 @@
           e.stopPropagation();
           const i = tasks.findIndex((x) => x.id === t.id);
           if (i < 0) return;
+          pushUndoSnapshot();
           tasks[i] = { ...tasks[i], importance: impKey };
           await firebaseUpdateTask(t.id, { importance: impKey });
           renderCalendar();
@@ -1841,6 +2012,7 @@
           showCancel: true,
         });
         if (!ok) return;
+        pushUndoSnapshot();
         tasks = tasks.filter((x) => x.id !== t.id);
         if (editingId === t.id) {
           resetModalFormForNewTaskOnDay();
@@ -2334,6 +2506,8 @@
       effortUnit,
     };
 
+    pushUndoSnapshot();
+
     if (editingId) {
       const i = tasks.findIndex((x) => x.id === editingId);
       if (i >= 0) {
@@ -2359,6 +2533,7 @@
       showCancel: true,
     });
     if (!ok) return;
+    pushUndoSnapshot();
     tasks = tasks.filter((x) => x.id !== editingId);
     await firebaseDeleteTask(editingId);
     renderCalendar();
@@ -2397,7 +2572,10 @@
       const st = btn.dataset.status || "ready";
       if (editingId) {
         const i = tasks.findIndex((x) => x.id === editingId);
-        if (i >= 0) tasks[i] = { ...tasks[i], status: st };
+        if (i >= 0) {
+          pushUndoSnapshot();
+          tasks[i] = { ...tasks[i], status: st };
+        }
         await firebaseUpdateTask(editingId, { status: st });
       } else {
         draftStatus = st;
@@ -2416,7 +2594,10 @@
       const imp = btn.dataset.importance || "medium";
       if (editingId) {
         const i = tasks.findIndex((x) => x.id === editingId);
-        if (i >= 0) tasks[i] = { ...tasks[i], importance: imp };
+        if (i >= 0) {
+          pushUndoSnapshot();
+          tasks[i] = { ...tasks[i], importance: imp };
+        }
         await firebaseUpdateTask(editingId, { importance: imp });
       } else {
         draftImportance = imp;
@@ -2653,6 +2834,25 @@
 
   btnSave.addEventListener("click", saveFromModal);
   btnDelete.addEventListener("click", deleteTask);
+
+  document.addEventListener("keydown", (e) => {
+    const target = e.target;
+    const inEditable =
+      target instanceof HTMLInputElement ||
+      target instanceof HTMLTextAreaElement ||
+      (target instanceof HTMLElement && target.isContentEditable);
+    if (inEditable) return;
+    const key = e.key.toLowerCase();
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && key === "z") {
+      e.preventDefault();
+      void undoOnce();
+      return;
+    }
+    if (((e.ctrlKey || e.metaKey) && key === "y") || ((e.ctrlKey || e.metaKey) && e.shiftKey && key === "z")) {
+      e.preventDefault();
+      void redoOnce();
+    }
+  });
 
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
