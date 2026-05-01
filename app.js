@@ -19,6 +19,7 @@
   * @property {'MH'|'MD'} effortUnit
   * @property {Array<{id: string, name: string, importance: 'high'|'medium'|'low', done: boolean, createdAt?: number | null}>} deliverables
  * @property {Record<string, Record<string, boolean>> | undefined} recurrenceProgress
+ * @property {string[] | undefined} recurrenceSkipStarts
    */
 
   /** @type {Task[]} */
@@ -146,7 +147,7 @@
   let lastPointerClientY = -1;
   let suppressRangeClickTaskId = null;
   let suppressRangeClickUntil = 0;
-  /** @type {null | { tasks: Task[], selectedDateStr: string | null, editingId: string | null, modalDefaultWhite: boolean, form: { title: string, description: string, effortValue: string, effortUnit: string, startDate: string, endDate: string, recurrence: 'none'|'daily'|'weekly'|'monthly', deliverableName: string, deliverableImportance: string } }} */
+  /** @type {null | { tasks: Task[], selectedDateStr: string | null, editingId: string | null, modalDefaultWhite: boolean, form: { title: string, description: string, effortValue: string, effortUnit: string, startDate: string, endDate: string, recurrence: 'none'|'daily'|'weekly'|'monthly', status: string, importance: string, deliverables: Array<{id: string, name: string, importance: 'high'|'medium'|'low', done: boolean, createdAt?: number | null}>, deliverableName: string, deliverableImportance: string } }} */
   let modalSessionSnapshot = null;
   const RECURRENCE_ALERT_STATE_KEY = "calendar-app-recurrence-alert-state-v1";
   let recurrenceWatchTimer = null;
@@ -577,6 +578,21 @@
     return task.recurrenceUntil && task.recurrenceUntil.length ? task.recurrenceUntil : "9999-12-31";
   }
 
+  function normalizeRecurrenceSkipStarts(rawList) {
+    if (!Array.isArray(rawList)) return [];
+    const set = new Set();
+    rawList.forEach((v) => {
+      if (typeof v !== "string") return;
+      if (/^\d{4}-\d{2}-\d{2}$/.test(v)) set.add(v);
+    });
+    return Array.from(set).sort();
+  }
+
+  function isOccurrenceSkipped(task, occStart) {
+    if (!task || !Array.isArray(task.recurrenceSkipStarts) || !occStart) return false;
+    return task.recurrenceSkipStarts.includes(occStart);
+  }
+
   function endOfWeekStr(dateStr) {
     const d = parseDateStr(dateStr);
     const delta = 6 - d.getDay();
@@ -600,6 +616,43 @@
     return null;
   }
 
+  function getRecurrenceCloneCount(rec) {
+    if (rec === "daily") return 7;
+    if (rec === "weekly") return 4;
+    if (rec === "monthly") return 12;
+    return 1;
+  }
+
+  function buildConcreteTasksFromRecurrence(payload, firstTaskId = null) {
+    const rec = payload && payload.recurrence ? payload.recurrence : "none";
+    if (rec === "none") {
+      return [normalizeTask({ id: firstTaskId || uuid(), ...payload })];
+    }
+    const count = getRecurrenceCloneCount(rec);
+    const out = [];
+    let occStart = payload.startDate;
+    let occEnd = payload.endDate;
+    for (let idx = 0; idx < count; idx++) {
+      out.push(
+        normalizeTask({
+          id: idx === 0 && firstTaskId ? firstTaskId : uuid(),
+          ...payload,
+          startDate: occStart,
+          endDate: occEnd,
+          recurrence: "none",
+          recurrenceUntil: null,
+          recurrenceProgress: {},
+          recurrenceSkipStarts: [],
+        })
+      );
+      const next = advanceOccurrence({ recurrence: rec }, occStart, occEnd);
+      if (!next) break;
+      occStart = next.start;
+      occEnd = next.end;
+    }
+    return out;
+  }
+
   function updateTopbarDatePill() {
     if (!(modalTodayDisplay instanceof HTMLElement)) return;
     const base = selectedDateStr || toDateStrFromDate(new Date());
@@ -620,7 +673,7 @@
     let e = task.endDate;
     for (let i = 0; i < 8000; i++) {
       if (s > until) break;
-      if (dateInRange(dateStr, s, e)) return true;
+      if (!isOccurrenceSkipped(task, s) && dateInRange(dateStr, s, e)) return true;
       const next = advanceOccurrence(/** @type {Task} */ (task), s, e);
       if (!next) break;
       s = next.start;
@@ -646,7 +699,7 @@
     let e = task.endDate;
     for (let i = 0; i < 8000; i++) {
       if (s > until) break;
-      if (dateInRange(dateStr, s, e)) return { start: s, end: e };
+      if (!isOccurrenceSkipped(task, s) && dateInRange(dateStr, s, e)) return { start: s, end: e };
       const next = advanceOccurrence(task, s, e);
       if (!next) break;
       s = next.start;
@@ -1200,6 +1253,7 @@
           : "none",
       recurrenceUntil: raw.recurrenceUntil != null && raw.recurrenceUntil !== "" ? raw.recurrenceUntil : null,
       recurrenceProgress: cloneRecurrenceProgress(raw.recurrenceProgress),
+      recurrenceSkipStarts: normalizeRecurrenceSkipStarts(raw.recurrenceSkipStarts),
       importance: raw.importance === "high" || raw.importance === "low" ? raw.importance : "medium",
       effortValue,
       effortUnit: raw.effortUnit === "MD" ? "MD" : "MH",
@@ -1312,6 +1366,7 @@
         recurrence: t.recurrence || "none",
         recurrenceUntil: t.recurrenceUntil || null,
         recurrenceProgress: cloneRecurrenceProgress(t.recurrenceProgress),
+        recurrenceSkipStarts: normalizeRecurrenceSkipStarts(t.recurrenceSkipStarts),
         effortValue: Number.isFinite(Number(t.effortValue)) && Number(t.effortValue) > 0 ? Number(t.effortValue) : null,
         effortUnit: t.effortUnit === "MD" ? "MD" : "MH",
         deliverables: normalizeDeliverables(t.deliverables),
@@ -1365,6 +1420,7 @@
       recurrence: t.recurrence || "none",
       recurrenceUntil: t.recurrenceUntil || null,
       recurrenceProgress: cloneRecurrenceProgress(t.recurrenceProgress),
+      recurrenceSkipStarts: normalizeRecurrenceSkipStarts(t.recurrenceSkipStarts),
       effortValue: Number.isFinite(Number(t.effortValue)) && Number(t.effortValue) > 0 ? Number(t.effortValue) : null,
       effortUnit: t.effortUnit === "MD" ? "MD" : "MH",
       deliverables: normalizeDeliverables(t.deliverables),
@@ -2009,6 +2065,7 @@
       ...t,
       deliverables: normalizeDeliverables(t.deliverables),
       recurrenceProgress: cloneRecurrenceProgress(t.recurrenceProgress),
+      recurrenceSkipStarts: normalizeRecurrenceSkipStarts(t.recurrenceSkipStarts),
     }));
   }
 
@@ -2055,10 +2112,51 @@
         startDate: taskStart.value,
         endDate: taskEnd.value,
         recurrence: /** @type {'none'|'daily'|'weekly'|'monthly'} */ (taskRecurrence.value),
+        status: getCurrentStatus(),
+        importance: getCurrentImportance(),
+        deliverables: collectDeliverablesFromModal(),
         deliverableName: deliverableNameInput ? deliverableNameInput.value : "",
         deliverableImportance: deliverableImportanceInput ? deliverableImportanceInput.value : "high",
       },
     };
+  }
+
+  function serializeDeliverablesForCompare(rows) {
+    return normalizeDeliverables(rows).map((r) => ({
+      id: String(r.id || ""),
+      name: String(r.name || ""),
+      importance: r.importance === "high" || r.importance === "low" ? r.importance : "medium",
+      done: !!r.done,
+      createdAt: Number.isFinite(Number(r.createdAt)) ? Math.floor(Number(r.createdAt)) : null,
+    }));
+  }
+
+  function hasModalDraftChanges() {
+    if (!modalSessionSnapshot) return false;
+    const now = buildModalSnapshot().form;
+    const base = modalSessionSnapshot.form;
+    if (now.title !== base.title) return true;
+    if (now.description !== base.description) return true;
+    if (now.effortValue !== base.effortValue) return true;
+    if (now.effortUnit !== base.effortUnit) return true;
+    if (now.startDate !== base.startDate) return true;
+    if (now.endDate !== base.endDate) return true;
+    if (now.recurrence !== base.recurrence) return true;
+    if (now.status !== base.status) return true;
+    if (now.importance !== base.importance) return true;
+    if ((now.deliverableName || "") !== (base.deliverableName || "")) return true;
+    if ((now.deliverableImportance || "") !== (base.deliverableImportance || "")) return true;
+    const nowRows = JSON.stringify(serializeDeliverablesForCompare(now.deliverables));
+    const baseRows = JSON.stringify(serializeDeliverablesForCompare(base.deliverables));
+    return nowRows !== baseRows;
+  }
+
+  function isEffectivelyEmptyDraft() {
+    const title = (taskTitle.value || "").trim();
+    const description = (taskDescription.value || "").trim();
+    const effortInputRaw = (taskEffortValue.value || "").trim();
+    const rows = collectDeliverablesFromModal();
+    return !editingId && !title && !description && !effortInputRaw && rows.length === 0;
   }
 
   function restoreModalSnapshot() {
@@ -2074,10 +2172,11 @@
     taskStart.value = modalSessionSnapshot.form.startDate;
     taskEnd.value = modalSessionSnapshot.form.endDate;
     taskRecurrence.value = modalSessionSnapshot.form.recurrence;
+    draftStatus = modalSessionSnapshot.form.status || "ready";
+    draftImportance = modalSessionSnapshot.form.importance || "medium";
     if (deliverableNameInput) deliverableNameInput.value = modalSessionSnapshot.form.deliverableName || "";
     if (deliverableImportanceInput) deliverableImportanceInput.value = modalSessionSnapshot.form.deliverableImportance || "high";
-    const editingTask = getEditingTask();
-    renderDeliverableList(getModalDeliverablesForDate(editingTask, selectedDateStr));
+    renderDeliverableList(modalSessionSnapshot.form.deliverables || []);
     refreshDeliverableHeaderUI();
     updateActualEffortPreview();
     btnDelete.hidden = !editingId;
@@ -3100,38 +3199,55 @@
       deliverables,
     };
 
-    if (editingId && selectedDateStr) {
-      const editingTask = tasks.find((x) => x.id === editingId);
-      if (editingTask && isNonInitialRecurrenceOccurrence(editingTask, selectedDateStr)) {
-        const occ = getOccurrenceContaining(editingTask, selectedDateStr);
-        const baseById = new Map(normalizeDeliverables(editingTask.deliverables).map((d) => [d.id, !!d.done]));
-        const progress = cloneRecurrenceProgress(editingTask.recurrenceProgress);
-        if (occ) {
-          progress[occ.start] = {};
-          deliverables.forEach((d) => {
-            progress[occ.start][d.id] = !!d.done;
-          });
-        }
-        payload.deliverables = payload.deliverables.map((d) => ({
-          ...d,
-          done: baseById.has(d.id) ? !!baseById.get(d.id) : false,
-        }));
-        payload.recurrenceProgress = progress;
-      }
-    }
-
     pushUndoSnapshot();
 
     if (editingId) {
       const i = tasks.findIndex((x) => x.id === editingId);
       if (i >= 0) {
-        tasks[i] = { ...tasks[i], ...payload };
-        await firebaseUpdateTask(editingId, payload);
+        const editingTask = tasks[i];
+        if (recurrence !== "none") {
+          const concrete = buildConcreteTasksFromRecurrence(payload, editingId);
+          if (concrete.length > 0) {
+            tasks[i] = concrete[0];
+            await firebaseUpdateTask(editingId, concrete[0]);
+            for (let c = 1; c < concrete.length; c++) {
+              tasks.push(concrete[c]);
+              await firebaseCreateTask(concrete[c]);
+            }
+          }
+          renderCalendar();
+          closeModal();
+          return;
+        }
+        const occ = selectedDateStr ? getOccurrenceContaining(editingTask, selectedDateStr) : null;
+        const splitOccurrence = !!(editingTask.recurrence && editingTask.recurrence !== "none" && occ && occ.start !== editingTask.startDate);
+        if (splitOccurrence && occ) {
+          const skipSet = new Set(normalizeRecurrenceSkipStarts(editingTask.recurrenceSkipStarts));
+          skipSet.add(occ.start);
+          const seriesPatch = { recurrenceSkipStarts: Array.from(skipSet).sort() };
+          tasks[i] = { ...tasks[i], ...seriesPatch };
+          await firebaseUpdateTask(editingId, seriesPatch);
+
+          const detachedTask = normalizeTask({ id: uuid(), ...payload });
+          tasks.push(detachedTask);
+          await firebaseCreateTask(detachedTask);
+        } else {
+          tasks[i] = { ...tasks[i], ...payload };
+          await firebaseUpdateTask(editingId, payload);
+        }
       }
     } else {
-      const newTask = { id: uuid(), ...payload };
-      tasks.push(newTask);
-      await firebaseCreateTask(newTask);
+      if (recurrence !== "none") {
+        const concrete = buildConcreteTasksFromRecurrence(payload);
+        for (let idx = 0; idx < concrete.length; idx++) {
+          tasks.push(concrete[idx]);
+          await firebaseCreateTask(concrete[idx]);
+        }
+      } else {
+        const newTask = { id: uuid(), ...payload };
+        tasks.push(newTask);
+        await firebaseCreateTask(newTask);
+      }
     }
 
     renderCalendar();
@@ -3500,7 +3616,16 @@
 
   btnUndo.addEventListener("click", restoreModalSnapshot);
   modalBackdrop.addEventListener("click", () => {
-    if (!taskModal.hidden) saveFromModal();
+    if (taskModal.hidden) return;
+    if (isEffectivelyEmptyDraft()) {
+      closeModal();
+      return;
+    }
+    if (hasModalDraftChanges()) {
+      void saveFromModal();
+      return;
+    }
+    closeModal();
   });
 
   btnSave.addEventListener("click", saveFromModal);
