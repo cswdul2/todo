@@ -80,10 +80,23 @@
           <h2 class="modal__title" id="modalTitle">할일 목록</h2>
           <p class="modal__hint" id="modalDateHint"></p>
         </div>
-        <button type="button" class="btn btn--primary modal__btn-new-top" id="btnNewTask">+ 새 할일 추가</button>
+        <div class="modal__topbar-actions">
+          <div class="modal__topbar-recurrence">
+            <select id="taskRecurrence" name="recurrence" class="modal__quick-input modal__quick-recurrence" aria-label="반복 설정">
+              <option value="none">반복 없음</option>
+              <option value="daily">매일</option>
+              <option value="weekly">매주</option>
+              <option value="monthly">매월</option>
+            </select>
+            <div class="modal__quick-rec-until-wrap">
+              <span class="modal__today-pill" id="modalTodayDisplay" aria-live="polite"></span>
+            </div>
+          </div>
+          <button type="button" class="btn btn--primary modal__btn-new-top" id="btnNewTask">+ 새 할일 추가</button>
+        </div>
       </div>
 
-      <div class="modal__field">
+      <div class="modal__field modal__field--inline">
         <label for="taskTitle">제목</label>
         <input type="text" id="taskTitle" name="title" placeholder="일정 제목" />
       </div>
@@ -100,12 +113,16 @@
           <div class="modal__quick-line modal__quick-line--effort">
             <label class="modal__quick-meta-label" for="taskEffortValue">투입예상공수</label>
             <div class="modal__quick-effort">
-              <input type="number" id="taskEffortValue" name="effortValue" min="0" step="0.25" placeholder="예: 24" class="modal__quick-input" />
+              <input type="number" id="taskEffortValue" name="effortValue" min="0" step="1" placeholder="예: 24" class="modal__quick-input" />
               <select id="taskEffortUnit" name="effortUnit" class="modal__quick-input modal__quick-unit">
                 <option value="MH">MH</option>
                 <option value="MD">MD</option>
               </select>
             </div>
+          </div>
+          <div class="modal__quick-line modal__quick-line--actual">
+            <label class="modal__quick-meta-label" for="taskActualEffortValue">투입실적공수</label>
+            <input type="text" id="taskActualEffortValue" class="modal__quick-input" readonly value="0MH" />
           </div>
           <div class="modal__quick-line modal__quick-line--start">
             <label class="modal__quick-meta-label" for="taskStart">시작일</label>
@@ -117,10 +134,12 @@
           </div>
           <div class="modal__quick-line modal__quick-line--status">
             <span class="modal__quick-meta-label">진행상태</span>
-            <div class="modal__quick-meta-group" id="quickStatusGroup" role="radiogroup" aria-label="진행 상태">
-              <button type="button" class="modal__quick-btn" data-status="ready">ready</button>
-              <button type="button" class="modal__quick-btn" data-status="on-going">on-going</button>
-              <button type="button" class="modal__quick-btn" data-status="done">done</button>
+            <div class="modal__quick-status-row">
+              <div class="modal__quick-meta-group" id="quickStatusGroup" role="radiogroup" aria-label="진행 상태">
+                <button type="button" class="modal__quick-btn" data-status="ready">ready</button>
+                <button type="button" class="modal__quick-btn" data-status="on-going">on-going</button>
+                <button type="button" class="modal__quick-btn" data-status="done">done</button>
+              </div>
             </div>
           </div>
         </div>
@@ -132,24 +151,23 @@
 
       <div class="modal__field">
         <label for="taskDescription">설명 (description)</label>
-        <textarea id="taskDescription" name="description" rows="4" placeholder="자세한 내용을 적어주세요."></textarea>
+        <textarea id="taskDescription" name="description" rows="2" placeholder="자세한 내용을 적어주세요."></textarea>
       </div>
 
       <div class="modal__section">
-        <h3 class="modal__section-title">반복일정 등록</h3>
-        <div class="modal__field">
-          <label for="taskRecurrence">반복</label>
-          <select id="taskRecurrence" name="recurrence">
-            <option value="none">반복 없음</option>
-            <option value="daily">매일</option>
-            <option value="weekly">매주 동일 요일</option>
-            <option value="monthly">매월 동일 일</option>
-          </select>
-        </div>
-        <div class="modal__field" id="recurrenceUntilWrap" hidden>
-          <label for="taskRecurrenceUntil">반복 종료일</label>
-          <input type="date" id="taskRecurrenceUntil" name="recurrenceUntil" />
-          <p class="modal__field-hint">이 날짜까지 반복됩니다. (첫 일정의 완료일 이후여야 합니다.)</p>
+        <h3 class="modal__section-title">예상산출물</h3>
+        <div class="deliverable-editor" id="deliverableEditor">
+          <div class="deliverable-editor__head" id="deliverableEditorHead">
+            <span class="deliverable-editor__spacer" aria-hidden="true"></span>
+            <textarea id="deliverableNameInput" class="deliverable-editor__name" rows="1" placeholder="산출물명 입력" spellcheck="false"></textarea>
+            <select id="deliverableImportanceInput" class="deliverable-editor__importance" aria-label="산출물 중요도">
+              <option value="high">상</option>
+              <option value="medium">중</option>
+              <option value="low">하</option>
+            </select>
+            <button type="button" class="btn btn--ghost deliverable-editor__add" id="btnAddDeliverable" aria-label="산출물 추가">➕</button>
+          </div>
+          <ul class="deliverable-list" id="deliverableList"></ul>
         </div>
       </div>
 

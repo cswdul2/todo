@@ -15,8 +15,10 @@
    * @property {'none'|'daily'|'weekly'|'monthly'} recurrence
    * @property {string | null} recurrenceUntil
    * @property {'high'|'medium'|'low'} importance
- * @property {number | null} effortValue
- * @property {'MH'|'MD'} effortUnit
+  * @property {number | null} effortValue
+  * @property {'MH'|'MD'} effortUnit
+  * @property {Array<{id: string, name: string, importance: 'high'|'medium'|'low', done: boolean, createdAt?: number | null}>} deliverables
+ * @property {Record<string, Record<string, boolean>> | undefined} recurrenceProgress
    */
 
   /** @type {Task[]} */
@@ -58,11 +60,16 @@
   const taskDescription = document.getElementById("taskDescription");
   const taskEffortValue = document.getElementById("taskEffortValue");
   const taskEffortUnit = document.getElementById("taskEffortUnit");
+  const taskActualEffortValue = document.getElementById("taskActualEffortValue");
+  const deliverableNameInput = document.getElementById("deliverableNameInput");
+  const deliverableImportanceInput = document.getElementById("deliverableImportanceInput");
+  const btnAddDeliverable = document.getElementById("btnAddDeliverable");
+  const deliverableEditorHead = document.getElementById("deliverableEditorHead");
+  const deliverableList = document.getElementById("deliverableList");
   const taskStart = document.getElementById("taskStart");
   const taskEnd = document.getElementById("taskEnd");
   const taskRecurrence = document.getElementById("taskRecurrence");
-  const taskRecurrenceUntil = document.getElementById("taskRecurrenceUntil");
-  const recurrenceUntilWrap = document.getElementById("recurrenceUntilWrap");
+  const modalTodayDisplay = document.getElementById("modalTodayDisplay");
   const btnUndo = document.getElementById("btnUndo");
   const btnSave = document.getElementById("btnSave");
   const btnDelete = document.getElementById("btnDelete");
@@ -139,8 +146,10 @@
   let lastPointerClientY = -1;
   let suppressRangeClickTaskId = null;
   let suppressRangeClickUntil = 0;
-  /** @type {null | { tasks: Task[], selectedDateStr: string | null, editingId: string | null, modalDefaultWhite: boolean, form: { title: string, description: string, effortValue: string, effortUnit: string, startDate: string, endDate: string, recurrence: 'none'|'daily'|'weekly'|'monthly', recurrenceUntil: string } }} */
+  /** @type {null | { tasks: Task[], selectedDateStr: string | null, editingId: string | null, modalDefaultWhite: boolean, form: { title: string, description: string, effortValue: string, effortUnit: string, startDate: string, endDate: string, recurrence: 'none'|'daily'|'weekly'|'monthly', deliverableName: string, deliverableImportance: string } }} */
   let modalSessionSnapshot = null;
+  const RECURRENCE_ALERT_STATE_KEY = "calendar-app-recurrence-alert-state-v1";
+  let recurrenceWatchTimer = null;
   // 이전 실행에서 남아있을 수 있는 커스텀 툴팁 노드 정리
   document.querySelectorAll(".range-line-tooltip").forEach((el) => el.remove());
 
@@ -568,6 +577,35 @@
     return task.recurrenceUntil && task.recurrenceUntil.length ? task.recurrenceUntil : "9999-12-31";
   }
 
+  function endOfWeekStr(dateStr) {
+    const d = parseDateStr(dateStr);
+    const delta = 6 - d.getDay();
+    return toDateStrFromDate(new Date(d.getFullYear(), d.getMonth(), d.getDate() + delta));
+  }
+
+  function endOfMonthStr(dateStr) {
+    const d = parseDateStr(dateStr);
+    return toDateStr(d.getFullYear(), d.getMonth() + 1, 0);
+  }
+
+  function endOfYearStr(dateStr) {
+    const d = parseDateStr(dateStr);
+    return `${d.getFullYear()}-12-31`;
+  }
+
+  function getRecurrenceWindowEnd(rec, baseDateStr) {
+    if (rec === "daily") return endOfWeekStr(baseDateStr);
+    if (rec === "weekly") return endOfMonthStr(baseDateStr);
+    if (rec === "monthly") return endOfYearStr(baseDateStr);
+    return null;
+  }
+
+  function updateTopbarDatePill() {
+    if (!(modalTodayDisplay instanceof HTMLElement)) return;
+    const base = selectedDateStr || toDateStrFromDate(new Date());
+    modalTodayDisplay.textContent = base;
+  }
+
   /**
    * @param {Task | Partial<Task> & { startDate: string, endDate: string }} task
    * @param {string} dateStr
@@ -629,6 +667,213 @@
     return task.effortUnit === "MD" ? raw * 24 : raw;
   }
 
+  function importanceWeight(importance) {
+    if (importance === "high") return 3;
+    if (importance === "low") return 1;
+    return 2;
+  }
+
+  const DELIVERABLE_NAME_MAX_LINES = 5;
+
+  /** @returns {'high'|'medium'|'low'} */
+  function deliverableNormalizedImportance(importanceRaw) {
+    return importanceRaw === "high" || importanceRaw === "low" ? importanceRaw : "medium";
+  }
+
+  /**
+   * @param {HTMLElement} el
+   * @param {'high'|'medium'|'low'} imp
+   */
+  function applyDeliverableImpBand(el, imp) {
+    if (!(el instanceof HTMLElement)) return;
+    el.classList.remove("deliverable-imp-band--high", "deliverable-imp-band--medium", "deliverable-imp-band--low");
+    el.classList.add(`deliverable-imp-band--${deliverableNormalizedImportance(imp)}`);
+  }
+
+  /** @param {HTMLTextAreaElement} ta */
+  function approximateTextareaLineHeightPx(ta) {
+    const cs = window.getComputedStyle(ta);
+    const lhRaw = cs.lineHeight;
+    const lhNum = parseFloat(lhRaw);
+    if (Number.isFinite(lhNum) && lhNum > 0) return lhNum;
+    const fs = parseFloat(cs.fontSize);
+    const base = Number.isFinite(fs) && fs > 0 ? fs : 16;
+    return Math.round(base * 1.4);
+  }
+
+  /** `.deliverable-editor`의 `--deliverable-row-h`와 동일한 바깥 높이(px). select/입력행 높이와 맞춤. */
+  function getDeliverableRowOuterHeightPx(ta) {
+    const ed = ta.closest(".deliverable-editor");
+    if (!ed) return null;
+    const raw = getComputedStyle(ed).getPropertyValue("--deliverable-row-h").trim();
+    if (!raw) return null;
+    const remMatch = raw.match(/^([\d.]+)\s*rem$/i);
+    if (remMatch) {
+      const rem = parseFloat(remMatch[1]);
+      const rootFs = parseFloat(getComputedStyle(document.documentElement).fontSize);
+      if (Number.isFinite(rem) && Number.isFinite(rootFs) && rootFs > 0) return rem * rootFs;
+    }
+    const pxMatch = raw.match(/^([\d.]+)\s*px$/i);
+    if (pxMatch) {
+      const px = parseFloat(pxMatch[1]);
+      return Number.isFinite(px) ? px : null;
+    }
+    return null;
+  }
+
+  /** 산출물명: 줄바꿈 자동 높이, 최대 5줄 후 스크롤 */
+  function fitDeliverableNameField(ta) {
+    if (!(ta instanceof HTMLTextAreaElement)) return;
+    ta.style.overflowY = "hidden";
+    const cs = window.getComputedStyle(ta);
+    const lh = approximateTextareaLineHeightPx(ta);
+    const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+    const bt = parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth);
+    const rowOuterPx = getDeliverableRowOuterHeightPx(ta);
+    const fallbackMin = lh + padY + bt;
+    const minH = rowOuterPx != null && rowOuterPx > 0 ? rowOuterPx : fallbackMin;
+    const maxH = lh * DELIVERABLE_NAME_MAX_LINES + padY + bt;
+    ta.style.minHeight = `${minH}px`;
+    ta.style.maxHeight = `${maxH}px`;
+    ta.style.height = "0px";
+    const need = ta.scrollHeight;
+    const clamped = Math.min(Math.max(need, minH), maxH);
+    ta.style.height = `${clamped}px`;
+    ta.style.overflowY = need > maxH + 0.5 ? "auto" : "hidden";
+  }
+
+  /** @param {HTMLTextAreaElement} ta */
+  /** 입력행(머리줄): 등급 띠 + 산출물명 높이 */
+  function refreshDeliverableHeaderUI() {
+    syncDeliverableHeadImpBandFromSelect();
+    if (deliverableNameInput instanceof HTMLTextAreaElement) {
+      queueMicrotask(() => fitDeliverableNameField(deliverableNameInput));
+    }
+  }
+
+  function bindDeliverableNameTextareaBehavior(ta) {
+    ta.addEventListener("input", () => {
+      fitDeliverableNameField(ta);
+      updateActualEffortPreview();
+    });
+    ta.addEventListener("paste", () => {
+      queueMicrotask(() => {
+        fitDeliverableNameField(ta);
+        updateActualEffortPreview();
+      });
+    });
+    ta.addEventListener(
+      "keydown",
+      /** @param {KeyboardEvent} e */
+      (e) => {
+        if (e.key !== "Enter" || e.ctrlKey || e.altKey || e.metaKey) return;
+        if (e.shiftKey) return;
+        e.preventDefault();
+      }
+    );
+  }
+
+  function syncDeliverableHeadImpBandFromSelect() {
+    if (!(deliverableEditorHead instanceof HTMLElement)) return;
+    deliverableEditorHead.classList.remove(
+      "deliverable-imp-band--high",
+      "deliverable-imp-band--medium",
+      "deliverable-imp-band--low"
+    );
+  }
+
+  function normalizeDeliverableCreatedAt(rawCreatedAt, id) {
+    const n = Number(rawCreatedAt);
+    if (Number.isFinite(n) && n > 0) return Math.floor(n);
+    if (typeof id === "string") {
+      const m = id.match(/^d-(\d+)-/);
+      if (m) {
+        const fromId = Number(m[1]);
+        if (Number.isFinite(fromId) && fromId > 0) return Math.floor(fromId);
+      }
+    }
+    return null;
+  }
+
+  function sortDeliverablesForView(rows) {
+    return rows
+      .map((row, idx) => ({ ...row, __idx: idx }))
+      .sort((a, b) => {
+        const impDiff = (IMP_ORDER[a.importance] ?? 1) - (IMP_ORDER[b.importance] ?? 1);
+        if (impDiff !== 0) return impDiff;
+        const aCreated = Number.isFinite(a.createdAt) ? Number(a.createdAt) : null;
+        const bCreated = Number.isFinite(b.createdAt) ? Number(b.createdAt) : null;
+        if (aCreated != null && bCreated != null && aCreated !== bCreated) return aCreated - bCreated;
+        return a.__idx - b.__idx;
+      })
+      .map(({ __idx, ...row }) => row);
+  }
+
+  function normalizeDeliverables(rawList) {
+    if (!Array.isArray(rawList)) return [];
+    return rawList
+      .map((row, idx) => {
+        const name = row && row.name != null ? String(row.name).trim() : "";
+        if (!name) return null;
+        const importance = row && (row.importance === "high" || row.importance === "low") ? row.importance : "medium";
+        const id = row && row.id ? String(row.id) : `d-${Date.now()}-${idx}`;
+        return {
+          id,
+          name,
+          importance,
+          done: !!(row && row.done),
+          createdAt: normalizeDeliverableCreatedAt(row && row.createdAt, id),
+        };
+      })
+      .filter(Boolean);
+  }
+
+  function cloneRecurrenceProgress(progressRaw) {
+    if (!progressRaw || typeof progressRaw !== "object") return {};
+    /** @type {Record<string, Record<string, boolean>>} */
+    const out = {};
+    Object.entries(progressRaw).forEach(([occStart, row]) => {
+      if (!row || typeof row !== "object") return;
+      const item = {};
+      Object.entries(row).forEach(([id, done]) => {
+        item[String(id)] = !!done;
+      });
+      if (Object.keys(item).length) out[String(occStart)] = item;
+    });
+    return out;
+  }
+
+  function taskProgressRatioOnDate(task, dateStr) {
+    const rows = normalizeDeliverables(task.deliverables);
+    if (!rows.length) return task.status === "done" ? 1 : 0;
+    let viewRows = rows;
+    if (task.recurrence && task.recurrence !== "none" && dateStr) {
+      const occ = getOccurrenceContaining(task, dateStr);
+      if (occ && occ.start !== task.startDate) {
+        const progress = cloneRecurrenceProgress(task.recurrenceProgress);
+        const rowState = progress[occ.start] || {};
+        viewRows = rows.map((r) => ({ ...r, done: !!rowState[r.id] }));
+      }
+    }
+    const totalWeight = viewRows.reduce((acc, row) => acc + importanceWeight(row.importance), 0);
+    if (totalWeight <= 0) return 0;
+    const doneWeight = viewRows.filter((row) => row.done).reduce((acc, row) => acc + importanceWeight(row.importance), 0);
+    return Math.max(0, Math.min(1, doneWeight / totalWeight));
+  }
+
+  function taskProgressRatio(task) {
+    const rows = normalizeDeliverables(task.deliverables);
+    if (!rows.length) return task.status === "done" ? 1 : 0;
+    const totalWeight = rows.reduce((acc, row) => acc + importanceWeight(row.importance), 0);
+    if (totalWeight <= 0) return 0;
+    const doneWeight = rows.filter((row) => row.done).reduce((acc, row) => acc + importanceWeight(row.importance), 0);
+    return Math.max(0, Math.min(1, doneWeight / totalWeight));
+  }
+
+  function taskSpentMh(task) {
+    return taskTotalMh(task) * taskProgressRatio(task);
+  }
+
   function taskDailyMhOnDate(task, dateStr) {
     const occ = getOccurrenceContaining(task, dateStr);
     if (!occ) return 0;
@@ -636,6 +881,32 @@
     if (!totalMh) return 0;
     const days = diffDaysInclusive(occ.start, occ.end);
     return totalMh / days;
+  }
+
+  function taskSpentDailyMhOnDate(task, dateStr) {
+    const occ = getOccurrenceContaining(task, dateStr);
+    if (!occ) return 0;
+    const spentMh = taskTotalMh(task) * taskProgressRatioOnDate(task, dateStr);
+    if (!spentMh) return 0;
+    const days = diffDaysInclusive(occ.start, occ.end);
+    return spentMh / days;
+  }
+
+  function isNonInitialRecurrenceOccurrence(task, dateStr) {
+    if (!task || !dateStr) return false;
+    if (!task.recurrence || task.recurrence === "none") return false;
+    const occ = getOccurrenceContaining(task, dateStr);
+    return !!(occ && occ.start !== task.startDate);
+  }
+
+  function getModalDeliverablesForDate(task, dateStr) {
+    const rows = normalizeDeliverables(task ? task.deliverables : []);
+    if (!task || !isNonInitialRecurrenceOccurrence(task, dateStr)) return rows;
+    const occ = getOccurrenceContaining(task, dateStr);
+    if (!occ) return rows.map((row) => ({ ...row, done: false }));
+    const progress = cloneRecurrenceProgress(task.recurrenceProgress);
+    const rowState = progress[occ.start] || {};
+    return rows.map((row) => ({ ...row, done: !!rowState[row.id] }));
   }
 
   function formatMh(v) {
@@ -743,6 +1014,13 @@
     return "중";
   }
 
+  function recurrenceLabel(rec) {
+    if (rec === "daily") return "매일";
+    if (rec === "weekly") return "매주";
+    if (rec === "monthly") return "매월";
+    return "반복 없음";
+  }
+
   /** 달력: 바깥 링 = 중요도(크기), 안쪽 점 = 진행 상태 색 */
   function importanceWrapClass(imp) {
     if (imp === "high") return "calendar-cell__dot-wrap calendar-cell__dot-wrap--high";
@@ -784,13 +1062,99 @@
     return getEditingTask()?.importance || draftImportance;
   }
 
+  function canSetDoneStatusFromModal() {
+    if (!deliverableList) return true;
+    const checks = deliverableList.querySelectorAll('.deliverable-item input[type="checkbox"]');
+    if (!checks.length) return true;
+    return Array.from(checks).every((el) => el instanceof HTMLInputElement && el.checked);
+  }
+
+  async function enforceDoneStatusConstraint() {
+    if (canSetDoneStatusFromModal()) return;
+    const current = getCurrentStatus();
+    if (current !== "done") return;
+
+    if (editingId) {
+      const i = tasks.findIndex((x) => x.id === editingId);
+      if (i >= 0) {
+        tasks[i] = { ...tasks[i], status: "on-going" };
+        await firebaseUpdateTask(editingId, { status: "on-going" });
+      }
+    } else {
+      draftStatus = "on-going";
+    }
+
+    modalDefaultWhite = false;
+    renderQuickMetaControls();
+    applyModalTheme();
+    renderCalendar();
+    if (!existingTasksWrap.hidden) renderExistingTasksList();
+  }
+
+  async function autoPromoteDoneStatusWhenEligible() {
+    const rows = collectDeliverablesFromModal();
+    if (!rows.length) return;
+    if (!rows.every((row) => !!row.done)) return;
+    const current = getCurrentStatus();
+    if (current === "done") return;
+
+    if (editingId) {
+      const i = tasks.findIndex((x) => x.id === editingId);
+      if (i >= 0) {
+        tasks[i] = { ...tasks[i], status: "done" };
+        await firebaseUpdateTask(editingId, { status: "done" });
+      }
+    } else {
+      draftStatus = "done";
+    }
+
+    modalDefaultWhite = false;
+    renderQuickMetaControls();
+    applyModalTheme();
+    renderCalendar();
+    if (!existingTasksWrap.hidden) renderExistingTasksList();
+  }
+
+  async function autoPromoteOngoingWhenStarted() {
+    const rows = collectDeliverablesFromModal();
+    if (!rows.length) return;
+    const anyDone = rows.some((row) => !!row.done);
+    if (!anyDone) return;
+    const allDone = rows.every((row) => !!row.done);
+    if (allDone) return;
+    const current = getCurrentStatus();
+    if (current !== "ready") return;
+
+    if (editingId) {
+      const i = tasks.findIndex((x) => x.id === editingId);
+      if (i >= 0) {
+        tasks[i] = { ...tasks[i], status: "on-going" };
+        await firebaseUpdateTask(editingId, { status: "on-going" });
+      }
+    } else {
+      draftStatus = "on-going";
+    }
+
+    modalDefaultWhite = false;
+    renderQuickMetaControls();
+    applyModalTheme();
+    renderCalendar();
+    if (!existingTasksWrap.hidden) renderExistingTasksList();
+  }
+
   function renderQuickMetaControls() {
     const status = getCurrentStatus();
     const imp = getCurrentImportance();
     if (quickStatusGroup) {
       const buttons = quickStatusGroup.querySelectorAll("button[data-status]");
+      const canDone = canSetDoneStatusFromModal();
       buttons.forEach((btn) => {
-        const active = btn.getAttribute("data-status") === status;
+        const isDoneBtn = btn.getAttribute("data-status") === "done";
+        const disabledDone = isDoneBtn && !canDone;
+        const active = !disabledDone && btn.getAttribute("data-status") === status;
+        btn.toggleAttribute("disabled", disabledDone);
+        btn.setAttribute("aria-disabled", disabledDone ? "true" : "false");
+        btn.classList.toggle("modal__quick-btn--disabled-done", disabledDone);
         btn.classList.toggle("modal__quick-btn--active", active);
         btn.setAttribute("aria-checked", active ? "true" : "false");
       });
@@ -828,12 +1192,108 @@
       status: raw.status || "ready",
       startDate: raw.startDate,
       endDate: raw.endDate,
-      recurrence: raw.recurrence === "daily" || raw.recurrence === "weekly" || raw.recurrence === "monthly" ? raw.recurrence : "none",
+      recurrence:
+        raw.recurrence === "daily" ||
+        raw.recurrence === "weekly" ||
+        raw.recurrence === "monthly"
+          ? raw.recurrence
+          : "none",
       recurrenceUntil: raw.recurrenceUntil != null && raw.recurrenceUntil !== "" ? raw.recurrenceUntil : null,
+      recurrenceProgress: cloneRecurrenceProgress(raw.recurrenceProgress),
       importance: raw.importance === "high" || raw.importance === "low" ? raw.importance : "medium",
       effortValue,
       effortUnit: raw.effortUnit === "MD" ? "MD" : "MH",
+      deliverables: normalizeDeliverables(raw.deliverables),
     };
+  }
+
+  function loadRecurrenceAlertState() {
+    try {
+      const raw = localStorage.getItem(RECURRENCE_ALERT_STATE_KEY);
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+
+  function saveRecurrenceAlertState(state) {
+    try {
+      localStorage.setItem(RECURRENCE_ALERT_STATE_KEY, JSON.stringify(state || {}));
+    } catch {
+      // ignore storage quota/permission errors
+    }
+  }
+
+  function recurrenceBoundaryKey(rec, dateStr) {
+    const d = parseDateStr(dateStr);
+    if (rec === "daily") return `week:${d.getFullYear()}-${endOfWeekStr(dateStr)}`;
+    if (rec === "weekly") return `month:${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
+    if (rec === "monthly") return `year:${d.getFullYear()}`;
+    return "none";
+  }
+
+  async function checkAndHandleRecurrenceExtension() {
+    if (!tasks.length) return;
+    const today = toDateStrFromDate(new Date());
+    let changedByMigration = false;
+    tasks = tasks.map((task) => {
+      if (!task || !task.id || !task.recurrence || task.recurrence === "none") return task;
+      if (task.recurrenceUntil) return task;
+      const autoCap = getRecurrenceWindowEnd(task.recurrence, task.endDate);
+      if (!autoCap) return task;
+      changedByMigration = true;
+      return { ...task, recurrenceUntil: autoCap };
+    });
+    if (changedByMigration) {
+      await saveTasks();
+    }
+
+    const groups = [
+      { rec: "daily", title: "반복 연장 확인", msg: "매일 반복을 한주 연장할건가요?" },
+      { rec: "weekly", title: "반복 연장 확인", msg: "매주 반복을 한달 연장할건가요?" },
+      { rec: "monthly", title: "반복 연장 확인", msg: "매월 반복을 일년 연장할건가요?" },
+    ];
+    const state = loadRecurrenceAlertState();
+    let changed = false;
+
+    for (const g of groups) {
+      const expired = tasks.filter((t) => t.recurrence === g.rec && t.recurrenceUntil && t.recurrenceUntil < today);
+      if (!expired.length) continue;
+      const boundary = recurrenceBoundaryKey(g.rec, today);
+      if (state[g.rec] === boundary) continue;
+
+      const ok = await openConfirmDialog(g.msg, {
+        title: g.title,
+        okLabel: "Yes",
+        cancelLabel: "No",
+        showCancel: true,
+      });
+
+      if (ok) {
+        const nextCap = getRecurrenceWindowEnd(g.rec, today);
+        if (nextCap) {
+          tasks = tasks.map((t) => (t.recurrence === g.rec && t.recurrenceUntil && t.recurrenceUntil < today ? { ...t, recurrenceUntil: nextCap } : t));
+          changed = true;
+        }
+      } else {
+        tasks = tasks.map((t) =>
+          t.recurrence === g.rec && t.recurrenceUntil && t.recurrenceUntil < today ? { ...t, recurrence: "none", recurrenceUntil: null } : t
+        );
+        changed = true;
+      }
+
+      state[g.rec] = boundary;
+      saveRecurrenceAlertState(state);
+    }
+
+    if (changed) {
+      await saveTasks();
+      renderCalendar();
+      updateSearchResults();
+      if (!taskModal.hidden) renderExistingTasksList();
+    }
   }
 
   function toFirebaseTasksMap(list) {
@@ -851,8 +1311,10 @@
         endDate: t.endDate,
         recurrence: t.recurrence || "none",
         recurrenceUntil: t.recurrenceUntil || null,
+        recurrenceProgress: cloneRecurrenceProgress(t.recurrenceProgress),
         effortValue: Number.isFinite(Number(t.effortValue)) && Number(t.effortValue) > 0 ? Number(t.effortValue) : null,
         effortUnit: t.effortUnit === "MD" ? "MD" : "MH",
+        deliverables: normalizeDeliverables(t.deliverables),
       };
     });
     return out;
@@ -902,8 +1364,10 @@
       endDate: t.endDate,
       recurrence: t.recurrence || "none",
       recurrenceUntil: t.recurrenceUntil || null,
+      recurrenceProgress: cloneRecurrenceProgress(t.recurrenceProgress),
       effortValue: Number.isFinite(Number(t.effortValue)) && Number(t.effortValue) > 0 ? Number(t.effortValue) : null,
       effortUnit: t.effortUnit === "MD" ? "MD" : "MH",
+      deliverables: normalizeDeliverables(t.deliverables),
       updatedAt: new Date().toISOString(),
     };
   }
@@ -1422,20 +1886,130 @@
     taskDescription.value = "";
     taskEffortValue.value = "";
     taskEffortUnit.value = "MH";
+    if (taskActualEffortValue) taskActualEffortValue.value = "0MH";
+    if (deliverableNameInput) deliverableNameInput.value = "";
+    if (deliverableImportanceInput) deliverableImportanceInput.value = "high";
+    if (deliverableList) deliverableList.innerHTML = "";
     if (selectedDateStr) {
       taskStart.value = selectedDateStr;
       taskEnd.value = selectedDateStr;
     }
     taskRecurrence.value = "none";
-    taskRecurrenceUntil.value = "";
-    toggleRecurrenceFields();
     btnDelete.hidden = true;
     renderQuickMetaControls();
     applyModalTheme();
+    refreshDeliverableHeaderUI();
+    updateActualEffortPreview();
+  }
+
+  function collectDeliverablesFromModal() {
+    if (!deliverableList) return [];
+    const out = [];
+    const rows = deliverableList.querySelectorAll(".deliverable-item");
+    rows.forEach((row, idx) => {
+      const nameEl = row.querySelector(".deliverable-item__name-input");
+      const impSelect = row.querySelector(".deliverable-item__importance-select");
+      const name =
+        nameEl instanceof HTMLTextAreaElement
+          ? nameEl.value.trim()
+          : nameEl instanceof HTMLInputElement
+            ? nameEl.value.trim()
+            : "";
+      const importanceRaw = impSelect instanceof HTMLSelectElement ? impSelect.value : "medium";
+      if (!name) return;
+      const importance = importanceRaw === "high" || importanceRaw === "low" ? importanceRaw : "medium";
+      const cb = row.querySelector('input[type="checkbox"]');
+      out.push({
+        id: row.getAttribute("data-id") || `d-${Date.now()}-${idx}`,
+        name,
+        importance,
+        done: cb instanceof HTMLInputElement ? cb.checked : false,
+        createdAt: normalizeDeliverableCreatedAt(row.getAttribute("data-created-at"), row.getAttribute("data-id")),
+      });
+    });
+    return out;
+  }
+
+  function bindDeliverableListRow(li, nameTa, impSelect) {
+    applyDeliverableImpBand(li, deliverableNormalizedImportance(impSelect.value));
+    bindDeliverableNameTextareaBehavior(nameTa);
+    impSelect.addEventListener("change", () => {
+      applyDeliverableImpBand(li, deliverableNormalizedImportance(impSelect.value));
+      renderDeliverableList(collectDeliverablesFromModal());
+      updateActualEffortPreview();
+    });
+    fitDeliverableNameField(nameTa);
+  }
+
+  function renderDeliverableList(rows) {
+    if (!deliverableList) return;
+    deliverableList.innerHTML = "";
+    sortDeliverablesForView(normalizeDeliverables(rows)).forEach((row) => {
+      const li = document.createElement("li");
+      li.className = "deliverable-item" + (row.done ? " deliverable-item--done" : "");
+      li.setAttribute("data-id", row.id || uuid());
+      if (Number.isFinite(row.createdAt) && Number(row.createdAt) > 0) {
+        li.setAttribute("data-created-at", String(Math.floor(Number(row.createdAt))));
+      }
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.checked = !!row.done;
+      cb.setAttribute("aria-label", "산출물 완료 여부");
+
+      const nameTa = document.createElement("textarea");
+      nameTa.className = "deliverable-item__name-input";
+      nameTa.rows = 1;
+      nameTa.spellcheck = false;
+      nameTa.value = row.name || "";
+      nameTa.placeholder = "산출물명";
+
+      const impSelect = document.createElement("select");
+      impSelect.className = "deliverable-item__importance-select";
+      impSelect.innerHTML = `<option value="high">상</option><option value="medium">중</option><option value="low">하</option>`;
+      impSelect.value = row.importance === "high" || row.importance === "low" ? row.importance : "medium";
+
+      const delBtn = document.createElement("button");
+      delBtn.type = "button";
+      delBtn.className = "deliverable-item__delete";
+      delBtn.textContent = "삭제";
+
+      li.appendChild(cb);
+      li.appendChild(nameTa);
+      li.appendChild(impSelect);
+      li.appendChild(delBtn);
+      deliverableList.appendChild(li);
+      bindDeliverableListRow(li, nameTa, impSelect);
+    });
+  }
+
+  function updateActualEffortPreview() {
+    if (!taskActualEffortValue) return;
+    const effortRaw = Number(taskEffortValue.value);
+    const effortUnit = taskEffortUnit.value === "MD" ? "MD" : "MH";
+    if (!Number.isFinite(effortRaw) || effortRaw <= 0) {
+      taskActualEffortValue.value = `0${effortUnit}`;
+      return;
+    }
+    const expectedMh = effortUnit === "MD" ? effortRaw * 24 : effortRaw;
+    const rows = collectDeliverablesFromModal();
+    const totalWeight = rows.reduce((acc, row) => acc + importanceWeight(row.importance), 0);
+    const doneWeight = rows.filter((row) => row.done).reduce((acc, row) => acc + importanceWeight(row.importance), 0);
+    const ratio = totalWeight > 0 ? doneWeight / totalWeight : 0;
+    const actualMh = expectedMh * ratio;
+    const viewValue = effortUnit === "MD" ? actualMh / 24 : actualMh;
+    taskActualEffortValue.value = `${formatMh(viewValue)}${effortUnit}`;
+    renderQuickMetaControls();
+    void enforceDoneStatusConstraint();
+    void autoPromoteOngoingWhenStarted();
+    void autoPromoteDoneStatusWhenEligible();
   }
 
   function cloneTasks(src) {
-    return src.map((t) => ({ ...t }));
+    return src.map((t) => ({
+      ...t,
+      deliverables: normalizeDeliverables(t.deliverables),
+      recurrenceProgress: cloneRecurrenceProgress(t.recurrenceProgress),
+    }));
   }
 
   function pushUndoSnapshot() {
@@ -1481,7 +2055,8 @@
         startDate: taskStart.value,
         endDate: taskEnd.value,
         recurrence: /** @type {'none'|'daily'|'weekly'|'monthly'} */ (taskRecurrence.value),
-        recurrenceUntil: taskRecurrenceUntil.value,
+        deliverableName: deliverableNameInput ? deliverableNameInput.value : "",
+        deliverableImportance: deliverableImportanceInput ? deliverableImportanceInput.value : "high",
       },
     };
   }
@@ -1499,8 +2074,12 @@
     taskStart.value = modalSessionSnapshot.form.startDate;
     taskEnd.value = modalSessionSnapshot.form.endDate;
     taskRecurrence.value = modalSessionSnapshot.form.recurrence;
-    taskRecurrenceUntil.value = modalSessionSnapshot.form.recurrenceUntil;
-    toggleRecurrenceFields();
+    if (deliverableNameInput) deliverableNameInput.value = modalSessionSnapshot.form.deliverableName || "";
+    if (deliverableImportanceInput) deliverableImportanceInput.value = modalSessionSnapshot.form.deliverableImportance || "high";
+    const editingTask = getEditingTask();
+    renderDeliverableList(getModalDeliverablesForDate(editingTask, selectedDateStr));
+    refreshDeliverableHeaderUI();
+    updateActualEffortPreview();
     btnDelete.hidden = !editingId;
     saveTasks().catch((err) => {
       console.error("restore snapshot save error:", err);
@@ -1545,7 +2124,7 @@
       const lab = taskLabel(t);
       const rec =
         t.recurrence && t.recurrence !== "none"
-          ? ` · 반복: ${t.recurrence}${t.recurrenceUntil ? " ~ " + t.recurrenceUntil : ""}`
+          ? ` · 반복: ${recurrenceLabel(t.recurrence)}${t.recurrenceUntil ? " ~ " + t.recurrenceUntil : ""}`
           : "";
       btn.innerHTML = `<div class="search-hit__title">${escapeHtml(lab)}</div><div class="search-hit__meta">${escapeHtml(t.status)} · 중요도 ${escapeHtml(importanceLabel(t.importance))} · ${t.startDate} ~ ${t.endDate}${escapeHtml(rec)}</div>`;
       btn.addEventListener("click", () => {
@@ -1670,7 +2249,7 @@
   function buildDailyMhBadgeTooltip(dayEffortRows, spentDailyMh, totalDailyMh) {
     if (!dayEffortRows.length) return "";
     const maxLines = 15;
-    const lines = dayEffortRows.map((x) => `${taskLabel(x.task)} (${formatMh(x.dailyMh)}MH)`);
+    const lines = dayEffortRows.map((x) => `${taskLabel(x.task)} (${formatMh(x.spentDailyMh)}/${formatMh(x.dailyMh)}MH)`);
     const shown = lines.slice(0, maxLines);
     let tip = `당일 공수 ${formatMh(spentDailyMh)}/${formatMh(totalDailyMh)}MH (투입/예상)`;
     tip += "\n────────\n";
@@ -1684,18 +2263,16 @@
     const ongoingTasks = list.filter((t) => t.status === "on-going");
     const ongoingCount = ongoingTasks.length;
     const allEffortRows = list
-      .map((t) => ({ task: t, dailyMh: taskDailyMhOnDate(t, dateStr) }))
+      .map((t) => ({ task: t, dailyMh: taskDailyMhOnDate(t, dateStr), spentDailyMh: taskSpentDailyMhOnDate(t, dateStr) }))
       .filter((x) => x.dailyMh > 0);
-    const remainingEffortRows = allEffortRows.filter((x) => x.task.status !== "done");
-    const remainingDailyMh = remainingEffortRows.reduce((acc, x) => acc + x.dailyMh, 0);
     const totalDailyMh = allEffortRows.reduce((acc, x) => acc + x.dailyMh, 0);
-    const spentDailyMh = Math.max(0, totalDailyMh - remainingDailyMh);
+    const spentDailyMh = allEffortRows.reduce((acc, x) => acc + x.spentDailyMh, 0);
     const ongoingEl = cell.querySelector(".calendar-cell__ongoing-count");
     if (ongoingEl) {
       if (totalDailyMh > 0) {
         ongoingEl.textContent = `${formatMh(spentDailyMh)}/${formatMh(totalDailyMh)}`;
         ongoingEl.hidden = false;
-        ongoingEl.classList.toggle("calendar-cell__ongoing-count--complete", remainingDailyMh <= 0.0001);
+        ongoingEl.classList.toggle("calendar-cell__ongoing-count--complete", totalDailyMh - spentDailyMh <= 0.0001);
         ongoingEl.title = buildDailyMhBadgeTooltip(allEffortRows, spentDailyMh, totalDailyMh);
         ongoingEl.setAttribute(
           "aria-label",
@@ -1714,6 +2291,7 @@
     if (dots) dots.innerHTML = "";
 
     cell.classList.remove("calendar-cell--heat-low", "calendar-cell--heat-mid", "calendar-cell--heat-high");
+    cell.classList.remove("calendar-cell--tip-active");
     if (ongoingCount > 0) {
       const score = ongoingImportanceScore(ongoingTasks);
       if (score >= 8) cell.classList.add("calendar-cell--heat-high");
@@ -1749,8 +2327,18 @@
         };
         wrap.addEventListener("mouseenter", updateDotTipAnchorPos);
         wrap.addEventListener("mousemove", updateDotTipAnchorPos);
+        wrap.addEventListener("mouseenter", () => {
+          cell.classList.add("calendar-cell--tip-active");
+        });
+        wrap.addEventListener("focus", () => {
+          cell.classList.add("calendar-cell--tip-active");
+        });
         wrap.addEventListener("mouseleave", () => {
+          cell.classList.remove("calendar-cell--tip-active");
           hideRangeTooltipNow();
+        });
+        wrap.addEventListener("blur", () => {
+          cell.classList.remove("calendar-cell--tip-active");
         });
         const openFromDot = () => openModal(dateStr, t.id);
         // 동그라미는 커스텀 플로팅 툴팁을 쓰지 않는다.
@@ -1784,21 +2372,11 @@
     }
   }
 
-  function toggleRecurrenceFields() {
-    const r = taskRecurrence.value;
-    const show = r !== "none";
-    recurrenceUntilWrap.hidden = !show;
-    if (show && !taskRecurrenceUntil.value && taskEnd.value) {
-      const t = parseDateStr(taskEnd.value);
-      t.setMonth(t.getMonth() + 3);
-      taskRecurrenceUntil.value = toDateStrFromDate(t);
-    }
-  }
-
   function openModal(dateStr, taskId, forceNew = false) {
     selectedDateStr = dateStr;
     editingId = taskId || null;
     modalDefaultWhite = !taskId;
+    updateTopbarDatePill();
 
     const ymd = parseDateStr(dateStr);
     modalDateHint.textContent = `${ymd.getFullYear()}년 ${ymd.getMonth() + 1}월 ${ymd.getDate()}일`;
@@ -1808,10 +2386,13 @@
       taskDescription.value = t.description || "";
       taskEffortValue.value = t.effortValue != null && Number(t.effortValue) > 0 ? String(t.effortValue) : "";
       taskEffortUnit.value = t.effortUnit === "MD" ? "MD" : "MH";
+      renderDeliverableList(getModalDeliverablesForDate(t, selectedDateStr));
+      if (deliverableNameInput) deliverableNameInput.value = "";
+      if (deliverableImportanceInput) deliverableImportanceInput.value = "high";
       taskStart.value = t.startDate;
       taskEnd.value = t.endDate;
       taskRecurrence.value = t.recurrence || "none";
-      taskRecurrenceUntil.value = t.recurrenceUntil || "";
+      updateActualEffortPreview();
     };
 
     if (taskId) {
@@ -1829,10 +2410,13 @@
         taskDescription.value = "";
         taskEffortValue.value = "";
         taskEffortUnit.value = "MH";
+        renderDeliverableList([]);
+        if (deliverableNameInput) deliverableNameInput.value = "";
+        if (deliverableImportanceInput) deliverableImportanceInput.value = "high";
         taskStart.value = dateStr;
         taskEnd.value = dateStr;
         taskRecurrence.value = "none";
-        taskRecurrenceUntil.value = "";
+        updateActualEffortPreview();
       } else {
       // 해당 날짜에 일정이 있으면 첫 항목을 기본 선택(날짜 변경 즉시 편집 가능)
       const onDay = tasks
@@ -1856,21 +2440,24 @@
         taskDescription.value = "";
         taskEffortValue.value = "";
         taskEffortUnit.value = "MH";
+        renderDeliverableList([]);
+        if (deliverableNameInput) deliverableNameInput.value = "";
+        if (deliverableImportanceInput) deliverableImportanceInput.value = "high";
         taskStart.value = dateStr;
         taskEnd.value = dateStr;
         taskRecurrence.value = "none";
-        taskRecurrenceUntil.value = "";
+        updateActualEffortPreview();
       }
       }
     }
 
-    toggleRecurrenceFields();
     btnDelete.hidden = !editingId;
     renderQuickMetaControls();
 
     applyModalTheme();
 
     renderExistingTasksList();
+    refreshDeliverableHeaderUI();
     modalBackdrop.hidden = false;
     taskModal.hidden = false;
     modalSessionSnapshot = buildModalSnapshot();
@@ -1913,7 +2500,7 @@
         (overdue ? " task-chip--overdue" : "");
       const lab = taskLabel(t);
       const short = lab.length > 42 ? lab.slice(0, 40) + "…" : lab;
-      const recBadge = t.recurrence && t.recurrence !== "none" ? ` · ${t.recurrence}` : "";
+      const recBadge = t.recurrence && t.recurrence !== "none" ? ` · ${recurrenceLabel(t.recurrence)}` : "";
       const imp = t.importance || "medium";
       const effortBadge =
         t.effortValue != null && Number(t.effortValue) > 0
@@ -1930,11 +2517,14 @@
         taskDescription.value = t.description || "";
         taskEffortValue.value = t.effortValue != null && Number(t.effortValue) > 0 ? String(t.effortValue) : "";
         taskEffortUnit.value = t.effortUnit === "MD" ? "MD" : "MH";
+        renderDeliverableList(getModalDeliverablesForDate(t, selectedDateStr));
+        if (deliverableNameInput) deliverableNameInput.value = "";
+        if (deliverableImportanceInput) deliverableImportanceInput.value = "high";
+        refreshDeliverableHeaderUI();
+        updateActualEffortPreview();
         taskStart.value = t.startDate;
         taskEnd.value = t.endDate;
         taskRecurrence.value = t.recurrence || "none";
-        taskRecurrenceUntil.value = t.recurrenceUntil || "";
-        toggleRecurrenceFields();
         btnDelete.hidden = false;
         renderQuickMetaControls();
         applyModalTheme();
@@ -2451,17 +3041,28 @@
     const title = taskTitle.value.trim();
     const status = getCurrentStatus();
     const description = taskDescription.value.trim();
+    const effortInputRaw = (taskEffortValue.value || "").trim();
     const effortRaw = Number(taskEffortValue.value);
     const effortValue = Number.isFinite(effortRaw) && effortRaw > 0 ? Math.round(effortRaw * 100) / 100 : null;
     const effortUnit = taskEffortUnit.value === "MD" ? "MD" : "MH";
     const startDate = taskStart.value;
     const endDate = taskEnd.value;
     const recurrence = /** @type {'none'|'daily'|'weekly'|'monthly'} */ (taskRecurrence.value);
-    let recurrenceUntil = taskRecurrenceUntil.value || null;
+    let recurrenceUntil = null;
     const importance = /** @type {'high'|'medium'|'low'} */ (getCurrentImportance());
+    const deliverables = collectDeliverablesFromModal();
+
+    if (effortInputRaw === "") {
+      await openAlertDialog("투입예상공수를 입력해 주세요.");
+      if (taskEffortValue instanceof HTMLInputElement) {
+        taskEffortValue.focus();
+        taskEffortValue.select();
+      }
+      return;
+    }
 
     // 새 항목에서 제목/설명이 모두 비면 저장하지 않고 닫는다 (유령 항목 생성 방지)
-    if (!editingId && !title && !description && !effortValue) {
+    if (!editingId && !title && !description && !effortValue && deliverables.length === 0) {
       closeModal();
       return;
     }
@@ -2481,16 +3082,8 @@
     }
 
     if (recurrence !== "none") {
-      if (!recurrenceUntil) {
-        await openAlertDialog("반복 일정인 경우 반복 종료일을 선택해 주세요.");
-        return;
-      }
-      if (parseDateStr(recurrenceUntil) < parseDateStr(endDate)) {
-        await openAlertDialog("반복 종료일은 첫 일정의 완료일 이후여야 합니다.");
-        return;
-      }
-    } else {
-      recurrenceUntil = null;
+      recurrenceUntil = getRecurrenceWindowEnd(recurrence, endDate);
+      if (!recurrenceUntil) recurrenceUntil = endDate;
     }
 
     const payload = {
@@ -2504,7 +3097,28 @@
       recurrenceUntil,
       effortValue,
       effortUnit,
+      deliverables,
     };
+
+    if (editingId && selectedDateStr) {
+      const editingTask = tasks.find((x) => x.id === editingId);
+      if (editingTask && isNonInitialRecurrenceOccurrence(editingTask, selectedDateStr)) {
+        const occ = getOccurrenceContaining(editingTask, selectedDateStr);
+        const baseById = new Map(normalizeDeliverables(editingTask.deliverables).map((d) => [d.id, !!d.done]));
+        const progress = cloneRecurrenceProgress(editingTask.recurrenceProgress);
+        if (occ) {
+          progress[occ.start] = {};
+          deliverables.forEach((d) => {
+            progress[occ.start][d.id] = !!d.done;
+          });
+        }
+        payload.deliverables = payload.deliverables.map((d) => ({
+          ...d,
+          done: baseById.has(d.id) ? !!baseById.get(d.id) : false,
+        }));
+        payload.recurrenceProgress = progress;
+      }
+    }
 
     pushUndoSnapshot();
 
@@ -2550,7 +3164,6 @@
   });
 
   taskStart.addEventListener("change", () => {
-    toggleRecurrenceFields();
     if (taskStart.value && taskEnd.value && parseDateStr(taskStart.value) > parseDateStr(taskEnd.value)) {
       openAlertDialog("시작일이 완료일보다 늦을 수 없습니다.");
       taskEnd.value = taskStart.value;
@@ -2562,13 +3175,71 @@
       taskEnd.value = taskStart.value;
     }
   });
-  taskRecurrence.addEventListener("change", () => {
-    toggleRecurrenceFields();
-  });
+  if (taskEffortValue) {
+    taskEffortValue.addEventListener("input", updateActualEffortPreview);
+  }
+  if (taskEffortUnit) {
+    taskEffortUnit.addEventListener("change", updateActualEffortPreview);
+  }
+  if (btnAddDeliverable) {
+    btnAddDeliverable.addEventListener("click", () => {
+      if (!deliverableNameInput || !deliverableImportanceInput) return;
+      const name = deliverableNameInput.value.trim();
+      if (!name) return;
+      const importanceRaw = deliverableImportanceInput.value;
+      const importance = importanceRaw === "high" || importanceRaw === "low" ? importanceRaw : "medium";
+      const current = collectDeliverablesFromModal();
+      current.push({ id: uuid(), name, importance, done: false, createdAt: Date.now() });
+      renderDeliverableList(current);
+      deliverableNameInput.value = "";
+      deliverableNameInput.focus();
+      refreshDeliverableHeaderUI();
+      updateActualEffortPreview();
+    });
+  }
+  if (deliverableImportanceInput) {
+    deliverableImportanceInput.addEventListener("change", () => {
+      refreshDeliverableHeaderUI();
+    });
+  }
+  if (deliverableNameInput instanceof HTMLTextAreaElement) {
+    bindDeliverableNameTextareaBehavior(deliverableNameInput);
+    queueMicrotask(() => refreshDeliverableHeaderUI());
+  }
+  if (deliverableList) {
+    deliverableList.addEventListener("click", (e) => {
+      const target = e.target;
+      if (!(target instanceof HTMLElement)) return;
+      const delBtn = target.closest(".deliverable-item__delete");
+      if (!(delBtn instanceof HTMLButtonElement)) return;
+      const item = delBtn.closest(".deliverable-item");
+      if (!(item instanceof HTMLElement)) return;
+      item.remove();
+      updateActualEffortPreview();
+    });
+    deliverableList.addEventListener("change", (e) => {
+      const target = e.target;
+      if (!(target instanceof HTMLElement)) return;
+      const item = target.closest(".deliverable-item");
+      if (!(item instanceof HTMLElement)) return;
+      const cb = item.querySelector('input[type="checkbox"]');
+      item.classList.toggle("deliverable-item--done", cb instanceof HTMLInputElement ? cb.checked : false);
+      renderQuickMetaControls();
+      updateActualEffortPreview();
+    });
+    deliverableList.addEventListener("input", (e) => {
+      const target = e.target;
+      if (!(target instanceof HTMLElement)) return;
+      const item = target.closest(".deliverable-item");
+      if (!(item instanceof HTMLElement)) return;
+      updateActualEffortPreview();
+    });
+  }
   if (quickStatusGroup) {
     quickStatusGroup.addEventListener("click", async (e) => {
       const btn = e.target instanceof HTMLElement ? e.target.closest("button[data-status]") : null;
       if (!(btn instanceof HTMLButtonElement)) return;
+      if (btn.disabled || btn.getAttribute("aria-disabled") === "true") return;
       const st = btn.dataset.status || "ready";
       if (editingId) {
         const i = tasks.findIndex((x) => x.id === editingId);
@@ -2877,9 +3548,21 @@
     requestAnimationFrame(renderMultiDayRangeLines);
   });
 
+  function startRecurrenceWatcher() {
+    if (recurrenceWatchTimer) clearInterval(recurrenceWatchTimer);
+    recurrenceWatchTimer = setInterval(() => {
+      checkAndHandleRecurrenceExtension().catch((err) => {
+        console.error("recurrence extension check error:", err);
+      });
+    }, 60 * 1000);
+  }
+
   (async () => {
     await loadGeminiKey();
     await loadTasks();
+    updateTopbarDatePill();
+    await checkAndHandleRecurrenceExtension();
+    startRecurrenceWatcher();
     renderCalendar();
   })();
 })();
