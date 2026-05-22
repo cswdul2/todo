@@ -123,6 +123,13 @@
 
   /** @type {Array<{ title: string, description: string, status: string, importance: string, startDate: string, endDate: string, effortValue: number | null, effortUnit: 'MH'|'MD', recurrence: 'none', recurrenceUntil: null, confidence?: number }>} */
   let ocrDraftRows = [];
+  const OCR_TASK_DEFAULTS = {
+    status: "ready",
+    importance: "medium",
+    effortValue: 4,
+    effortUnit: "MH",
+    recurrence: "none",
+  };
   /** 새 일정 작성용 임시 상태/중요도 */
   let draftStatus = "ready";
   let draftImportance = "medium";
@@ -2836,11 +2843,12 @@
     let startDate = normalizeOcrDate(o.startDate, fallbackYear);
     let endDate = normalizeOcrDate(o.endDate, fallbackYear);
     if (startDate && endDate && parseDateStr(startDate) > parseDateStr(endDate)) endDate = startDate;
-    const status = ["ready", "on-going", "done"].includes(o.status) ? o.status : "ready";
-    const importance = ["high", "medium", "low"].includes(o.importance) ? o.importance : "";
+    const status = ["ready", "on-going", "done"].includes(o.status) ? o.status : OCR_TASK_DEFAULTS.status;
+    const importance = ["high", "medium", "low"].includes(o.importance) ? o.importance : OCR_TASK_DEFAULTS.importance;
     const rawEffort = Number(o.effortValue);
-    const effortValue = Number.isFinite(rawEffort) && rawEffort > 0 ? Math.round(rawEffort * 100) / 100 : 2;
-    const effortUnit = o.effortUnit === "MD" ? "MD" : "MH";
+    const effortValue =
+      Number.isFinite(rawEffort) && rawEffort > 0 ? Math.round(rawEffort * 100) / 100 : OCR_TASK_DEFAULTS.effortValue;
+    const effortUnit = o.effortUnit === "MD" ? "MD" : OCR_TASK_DEFAULTS.effortUnit;
     const description = o.description != null ? String(o.description) : "";
     const rawC = Number(o.confidence);
     let confidence = Number.isFinite(rawC) ? rawC : NaN;
@@ -2862,7 +2870,7 @@
       effortUnit,
       startDate,
       endDate,
-      recurrence: /** @type {'none'} */ ("none"),
+      recurrence: /** @type {'none'} */ (OCR_TASK_DEFAULTS.recurrence),
       recurrenceUntil: null,
       confidence,
     };
@@ -2884,8 +2892,8 @@
 - 날짜가 전혀 없으면 startDate/endDate는 빈 문자열로 둡니다.
 - 한 줄에 날짜와 제목이 같이 있으면 그 날짜에 그 제목을 넣습니다.
 - status는 판별 가능할 때 채우고, 애매하면 "ready"로 둡니다.
-- importance는 판별 가능할 때만 채우고 애매하면 빈 문자열.
-- effortValue/effortUnit은 적혀 있을 때 채우고, 없으면 effortValue는 2, effortUnit은 "MH"로 둡니다.
+- importance는 판별 가능할 때만 채우고, 애매하면 "medium"으로 둡니다.
+- effortValue/effortUnit은 적혀 있을 때 채우고, 없으면 effortValue는 4, effortUnit은 "MH"로 둡니다.
 - description은 부가 메모가 있을 때만 채우고 없으면 빈 문자열.
 - confidence는 해당 항목 인식 신뢰도(0~1 또는 0~100 숫자)로 넣습니다.
 - JSON 배열만 출력하고 다른 설명은 쓰지 마세요.`;
@@ -3028,10 +3036,13 @@
       if (titleEl) titleEl.value = row.title || "";
       if (sEl) sEl.value = row.startDate || "";
       if (eEl) eEl.value = row.endDate || "";
-      if (stEl) stEl.value = row.status || "";
-      if (imEl) imEl.value = row.importance || "";
-      if (efEl) efEl.value = row.effortValue != null && Number(row.effortValue) > 0 ? String(row.effortValue) : "";
-      if (euEl) euEl.value = row.effortUnit === "MD" ? "MD" : "MH";
+      if (stEl) stEl.value = row.status || OCR_TASK_DEFAULTS.status;
+      if (imEl) imEl.value = row.importance || OCR_TASK_DEFAULTS.importance;
+      if (efEl) {
+        efEl.value =
+          row.effortValue != null && Number(row.effortValue) > 0 ? String(row.effortValue) : String(OCR_TASK_DEFAULTS.effortValue);
+      }
+      if (euEl) euEl.value = row.effortUnit === "MD" ? "MD" : OCR_TASK_DEFAULTS.effortUnit;
       if (dEl) dEl.value = row.description || "";
     });
   }
@@ -3050,8 +3061,9 @@
       const cb = /** @type {HTMLInputElement | null} */ (ocrDraftList.querySelector(`.ocr-draft-cb[data-index="${index}"]`));
       if (!cb || !cb.checked) return;
       const effortRaw = ef && ef.value.trim() !== "" ? Number(ef.value) : NaN;
-      const effortValue = Number.isFinite(effortRaw) && effortRaw > 0 ? Math.round(effortRaw * 100) / 100 : null;
-      const effortUnit = eu && eu.value === "MD" ? "MD" : "MH";
+      const effortValue =
+        Number.isFinite(effortRaw) && effortRaw > 0 ? Math.round(effortRaw * 100) / 100 : OCR_TASK_DEFAULTS.effortValue;
+      const effortUnit = eu && eu.value === "MD" ? "MD" : OCR_TASK_DEFAULTS.effortUnit;
       const startDraft = s && s.value ? s.value : "";
       const endDraft = e && e.value ? e.value : "";
       const finalStart = startDraft || endDraft || toDateStrFromDate(new Date());
