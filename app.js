@@ -64,8 +64,8 @@
   const taskActualEffortValue = document.getElementById("taskActualEffortValue");
   const deliverableNameInput = document.getElementById("deliverableNameInput");
   const deliverableImportanceInput = document.getElementById("deliverableImportanceInput");
-  const btnAddDeliverable = document.getElementById("btnAddDeliverable");
   const btnDeliverableAddToggle = document.getElementById("btnDeliverableAddToggle");
+  const deliverableEditor = document.getElementById("deliverableEditor");
   const deliverableEditorHead = document.getElementById("deliverableEditorHead");
   const deliverableList = document.getElementById("deliverableList");
   const taskStart = document.getElementById("taskStart");
@@ -132,6 +132,8 @@
   /** 새 일정 작성용 임시 상태/중요도 */
   let draftStatus = "ready";
   let draftImportance = "medium";
+  /** 산출물 입력행에서 등급을 직접 고른 적이 있는지 (고르기 전에는 회색 박스) */
+  let deliverableHeadImpPicked = false;
   /** @type {string | null} */
   let ocrPendingBase64 = null;
   /** @type {string} */
@@ -833,23 +835,29 @@
   function resetDeliverableInputRow() {
     if (deliverableNameInput) deliverableNameInput.value = "";
     if (deliverableImportanceInput) deliverableImportanceInput.value = "high";
+    deliverableHeadImpPicked = false;
     setDeliverableInputRowOpen(false);
   }
 
-  /** 입력행의 내용을 산출물 목록에 추가한다. */
-  function commitDeliverableFromInputRow() {
-    if (!deliverableNameInput || !deliverableImportanceInput) return;
+  /**
+   * 입력행의 내용을 산출물 목록에 추가한다.
+   * @param {{ keepFocus?: boolean }} opts
+   */
+  function commitDeliverableFromInputRow(opts = {}) {
+    if (!deliverableNameInput || !deliverableImportanceInput) return false;
     const name = deliverableNameInput.value.trim();
-    if (!name) return;
+    if (!name) return false;
     const importanceRaw = deliverableImportanceInput.value;
     const importance = importanceRaw === "high" || importanceRaw === "low" ? importanceRaw : "medium";
     const current = collectDeliverablesFromModal();
     current.push({ id: uuid(), name, importance, done: false, createdAt: Date.now() });
     renderDeliverableList(current);
     deliverableNameInput.value = "";
-    deliverableNameInput.focus();
+    deliverableHeadImpPicked = false;
+    if (opts.keepFocus) deliverableNameInput.focus();
     refreshDeliverableHeaderUI();
     updateActualEffortPreview();
+    return true;
   }
 
   function bindDeliverableNameTextareaBehavior(ta) {
@@ -870,11 +878,12 @@
         if (e.key !== "Enter" || e.ctrlKey || e.altKey || e.metaKey) return;
         if (e.shiftKey) return;
         e.preventDefault();
-        commitDeliverableFromInputRow();
+        commitDeliverableFromInputRow({ keepFocus: true });
       }
     );
   }
 
+  /** 입력행은 등급을 고르기 전까지 회색 박스로 둔다. */
   function syncDeliverableHeadImpBandFromSelect() {
     if (!(deliverableEditorHead instanceof HTMLElement)) return;
     deliverableEditorHead.classList.remove(
@@ -882,6 +891,8 @@
       "deliverable-imp-band--medium",
       "deliverable-imp-band--low"
     );
+    if (!deliverableHeadImpPicked || !(deliverableImportanceInput instanceof HTMLSelectElement)) return;
+    applyDeliverableImpBand(deliverableEditorHead, deliverableNormalizedImportance(deliverableImportanceInput.value));
   }
 
   function normalizeDeliverableCreatedAt(rawCreatedAt, id) {
@@ -3181,6 +3192,7 @@
   }
 
   function closeModal() {
+    closeDatePop();
     modalBackdrop.hidden = true;
     taskModal.hidden = true;
     editingId = null;
@@ -3189,6 +3201,8 @@
   }
 
   async function saveFromModal() {
+    // 입력칸에 남아 있는 산출물도 저장 대상에 포함한다.
+    commitDeliverableFromInputRow();
     const title = taskTitle.value.trim();
     const status = getCurrentStatus();
     const description = taskDescription.value.trim();
@@ -3331,6 +3345,271 @@
     taskTitle.focus();
   });
 
+  /* ── 시작일/종료일: 마우스를 올리면 뜨는 달력(드래그로 기간 지정) ───────────── */
+
+  const DATE_POP_CLOSE_DELAY_MS = 180;
+  /** @type {HTMLElement | null} */
+  let datePopEl = null;
+  /** @type {HTMLElement | null} */
+  let datePopGrid = null;
+  /** @type {HTMLElement | null} */
+  let datePopTitle = null;
+  /** @type {'start' | 'end' | null} */
+  let datePopField = null;
+  let datePopYear = 0;
+  let datePopMonth = 0;
+  /** @type {number | null} */
+  let datePopCloseTimer = null;
+  /** @type {{ anchor: string, hover: string } | null} */
+  let datePopDrag = null;
+  /** 마우스 클릭 직후의 focus 로는 달력을 다시 열지 않는다(기본 달력과 충돌 방지). */
+  let datePopFocusSuppressUntil = 0;
+
+  function isDatePopOpen() {
+    return !!datePopEl && !datePopEl.hidden;
+  }
+
+  function closeDatePop() {
+    if (datePopCloseTimer != null) {
+      clearTimeout(datePopCloseTimer);
+      datePopCloseTimer = null;
+    }
+    datePopDrag = null;
+    datePopField = null;
+    if (datePopEl) datePopEl.hidden = true;
+  }
+
+  function scheduleCloseDatePop() {
+    if (datePopCloseTimer != null) clearTimeout(datePopCloseTimer);
+    datePopCloseTimer = window.setTimeout(() => {
+      datePopCloseTimer = null;
+      if (!datePopDrag) closeDatePop();
+    }, DATE_POP_CLOSE_DELAY_MS);
+  }
+
+  function cancelCloseDatePop() {
+    if (datePopCloseTimer != null) {
+      clearTimeout(datePopCloseTimer);
+      datePopCloseTimer = null;
+    }
+  }
+
+  function ensureDatePop() {
+    if (datePopEl) return datePopEl;
+    const pop = document.createElement("div");
+    pop.className = "date-pop";
+    pop.id = "datePop";
+    pop.hidden = true;
+    pop.setAttribute("role", "dialog");
+    pop.setAttribute("aria-label", "날짜 선택");
+    pop.innerHTML = `
+      <div class="date-pop__head">
+        <button type="button" class="date-pop__nav" data-nav="-1" aria-label="이전 달">‹</button>
+        <span class="date-pop__title"></span>
+        <button type="button" class="date-pop__nav" data-nav="1" aria-label="다음 달">›</button>
+      </div>
+      <div class="date-pop__weekdays">
+        <span class="date-pop__weekday date-pop__weekday--sun">일</span>
+        <span class="date-pop__weekday">월</span>
+        <span class="date-pop__weekday">화</span>
+        <span class="date-pop__weekday">수</span>
+        <span class="date-pop__weekday">목</span>
+        <span class="date-pop__weekday">금</span>
+        <span class="date-pop__weekday date-pop__weekday--sat">토</span>
+      </div>
+      <div class="date-pop__grid"></div>
+      <p class="date-pop__hint">클릭: 날짜 지정 · 드래그: 시작일~종료일 지정</p>
+    `;
+    document.body.appendChild(pop);
+    datePopEl = pop;
+    datePopGrid = pop.querySelector(".date-pop__grid");
+    datePopTitle = pop.querySelector(".date-pop__title");
+
+    pop.addEventListener("mouseenter", cancelCloseDatePop);
+    pop.addEventListener("mouseleave", scheduleCloseDatePop);
+
+    pop.addEventListener("click", (e) => {
+      const nav = e.target instanceof HTMLElement ? e.target.closest(".date-pop__nav") : null;
+      if (!(nav instanceof HTMLElement)) return;
+      const step = Number(nav.dataset.nav) || 0;
+      const base = new Date(datePopYear, datePopMonth + step, 1);
+      datePopYear = base.getFullYear();
+      datePopMonth = base.getMonth();
+      renderDatePop();
+    });
+
+    if (datePopGrid) {
+      datePopGrid.addEventListener("mousedown", (e) => {
+        const day = e.target instanceof HTMLElement ? e.target.closest(".date-pop__day") : null;
+        if (!(day instanceof HTMLElement) || !day.dataset.date) return;
+        e.preventDefault();
+        datePopDrag = { anchor: day.dataset.date, hover: day.dataset.date };
+        // 이 이벤트가 문서까지 전파되는 동안 눌린 버튼이 사라지지 않도록 다음 프레임에 다시 그린다.
+        requestAnimationFrame(() => {
+          if (datePopDrag) renderDatePop();
+        });
+      });
+      datePopGrid.addEventListener("mouseover", (e) => {
+        if (!datePopDrag) return;
+        const day = e.target instanceof HTMLElement ? e.target.closest(".date-pop__day") : null;
+        if (!(day instanceof HTMLElement) || !day.dataset.date) return;
+        if (datePopDrag.hover === day.dataset.date) return;
+        datePopDrag.hover = day.dataset.date;
+        renderDatePop();
+      });
+    }
+    return pop;
+  }
+
+  function positionDatePop(anchorEl) {
+    if (!datePopEl || !(anchorEl instanceof HTMLElement)) return;
+    const rect = anchorEl.getBoundingClientRect();
+    const popRect = datePopEl.getBoundingClientRect();
+    const margin = 8;
+    let left = rect.left;
+    if (left + popRect.width > window.innerWidth - margin) {
+      left = Math.max(margin, window.innerWidth - margin - popRect.width);
+    }
+    let top = rect.bottom + 6;
+    if (top + popRect.height > window.innerHeight - margin) {
+      const above = rect.top - 6 - popRect.height;
+      top = above >= margin ? above : Math.max(margin, window.innerHeight - margin - popRect.height);
+    }
+    datePopEl.style.left = `${Math.round(left)}px`;
+    datePopEl.style.top = `${Math.round(top)}px`;
+  }
+
+  function renderDatePop() {
+    if (!datePopEl || !datePopGrid) return;
+    if (datePopTitle) datePopTitle.textContent = `${datePopYear}년 ${datePopMonth + 1}월`;
+
+    const startStr = taskStart.value || "";
+    const endStr = taskEnd.value || "";
+    let rangeFrom = startStr;
+    let rangeTo = endStr;
+    if (datePopDrag) {
+      const a = datePopDrag.anchor;
+      const b = datePopDrag.hover;
+      rangeFrom = a <= b ? a : b;
+      rangeTo = a <= b ? b : a;
+    }
+
+    const todayStr = toDateStrFromDate(new Date());
+    const first = new Date(datePopYear, datePopMonth, 1);
+    const leading = first.getDay();
+    const daysInMonth = new Date(datePopYear, datePopMonth + 1, 0).getDate();
+    const cells = [];
+
+    for (let i = 0; i < leading; i++) cells.push(null);
+    for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(datePopYear, datePopMonth, d));
+    while (cells.length % 7 !== 0) cells.push(null);
+
+    datePopGrid.innerHTML = "";
+    cells.forEach((date) => {
+      if (!date) {
+        const blank = document.createElement("span");
+        blank.className = "date-pop__day date-pop__day--blank";
+        datePopGrid.appendChild(blank);
+        return;
+      }
+      const dateStr = toDateStrFromDate(date);
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "date-pop__day";
+      btn.dataset.date = dateStr;
+      btn.textContent = String(date.getDate());
+      const dow = date.getDay();
+      if (dow === 0) btn.classList.add("date-pop__day--sun");
+      if (dow === 6) btn.classList.add("date-pop__day--sat");
+      if (dateStr === todayStr) btn.classList.add("date-pop__day--today");
+      if (rangeFrom && rangeTo && dateStr > rangeFrom && dateStr < rangeTo) {
+        btn.classList.add("date-pop__day--in-range");
+      }
+      if (dateStr === rangeFrom) btn.classList.add("date-pop__day--range-start");
+      if (dateStr === rangeTo) btn.classList.add("date-pop__day--range-end");
+      datePopGrid.appendChild(btn);
+    });
+  }
+
+  /** 달력에서 고른 값을 입력칸에 반영한다. */
+  function applyDatePopSelection(from, to) {
+    const single = !to || from === to;
+    if (single) {
+      if (datePopField === "end") taskEnd.value = from;
+      else taskStart.value = from;
+    } else {
+      taskStart.value = from;
+      taskEnd.value = to;
+    }
+    if (taskStart.value && taskEnd.value && parseDateStr(taskStart.value) > parseDateStr(taskEnd.value)) {
+      if (datePopField === "end") taskStart.value = taskEnd.value;
+      else taskEnd.value = taskStart.value;
+    }
+    taskStart.dispatchEvent(new Event("change", { bubbles: true }));
+    taskEnd.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
+  /** @param {'start'|'end'} field */
+  function openDatePop(field) {
+    const input = field === "end" ? taskEnd : taskStart;
+    if (!(input instanceof HTMLInputElement)) return;
+    if (taskModal.hidden) return;
+    ensureDatePop();
+    if (!datePopEl) return;
+    cancelCloseDatePop();
+    datePopField = field;
+    const base = parseDateStr(input.value || taskStart.value || toDateStrFromDate(new Date()));
+    const anchorDate = Number.isNaN(base.getTime()) ? new Date() : base;
+    datePopYear = anchorDate.getFullYear();
+    datePopMonth = anchorDate.getMonth();
+    datePopDrag = null;
+    datePopEl.hidden = false;
+    renderDatePop();
+    positionDatePop(input);
+  }
+
+  [
+    /** @type {const} */ ({ field: "start", input: taskStart }),
+    /** @type {const} */ ({ field: "end", input: taskEnd }),
+  ].forEach(({ field, input }) => {
+    if (!(input instanceof HTMLInputElement)) return;
+    input.addEventListener("mouseenter", () => openDatePop(field));
+    input.addEventListener("mouseleave", scheduleCloseDatePop);
+    // 기본 브라우저 달력을 쓰려고 클릭하면 직접 만든 달력은 닫는다.
+    input.addEventListener("mousedown", () => {
+      datePopFocusSuppressUntil = Date.now() + 400;
+      closeDatePop();
+    });
+    input.addEventListener("focus", () => {
+      if (Date.now() < datePopFocusSuppressUntil) return;
+      openDatePop(field);
+    });
+  });
+
+  document.addEventListener("mouseup", () => {
+    if (!datePopDrag) return;
+    const { anchor, hover } = datePopDrag;
+    const from = anchor <= hover ? anchor : hover;
+    const to = anchor <= hover ? hover : anchor;
+    datePopDrag = null;
+    applyDatePopSelection(from, to);
+    closeDatePop();
+  });
+
+  document.addEventListener("mousedown", (e) => {
+    if (!isDatePopOpen()) return;
+    if (datePopDrag) return;
+    const target = e.target;
+    if (!(target instanceof HTMLElement)) return;
+    if (datePopEl && datePopEl.contains(target)) return;
+    if (target === taskStart || target === taskEnd) return;
+    closeDatePop();
+  });
+
+  window.addEventListener("scroll", () => {
+    if (isDatePopOpen()) closeDatePop();
+  }, true);
+
   taskStart.addEventListener("change", () => {
     if (taskStart.value && taskEnd.value && parseDateStr(taskStart.value) > parseDateStr(taskEnd.value)) {
       openAlertDialog("시작일이 완료일보다 늦을 수 없습니다.");
@@ -3349,15 +3628,12 @@
   if (taskEffortUnit) {
     taskEffortUnit.addEventListener("change", updateActualEffortPreview);
   }
-  if (btnAddDeliverable) {
-    btnAddDeliverable.addEventListener("click", commitDeliverableFromInputRow);
-  }
   if (btnDeliverableAddToggle) {
     btnDeliverableAddToggle.addEventListener("click", () => {
       if (isDeliverableInputRowOpen()) {
         // 입력한 내용이 있으면 먼저 목록에 추가하고, 비어 있으면 입력칸을 닫는다.
         const pending = deliverableNameInput ? deliverableNameInput.value.trim() : "";
-        if (pending) commitDeliverableFromInputRow();
+        if (pending) commitDeliverableFromInputRow({ keepFocus: true });
         else setDeliverableInputRowOpen(false);
         return;
       }
@@ -3366,13 +3642,27 @@
   }
   if (deliverableImportanceInput) {
     deliverableImportanceInput.addEventListener("change", () => {
+      deliverableHeadImpPicked = true;
       refreshDeliverableHeaderUI();
     });
   }
   if (deliverableNameInput instanceof HTMLTextAreaElement) {
     bindDeliverableNameTextareaBehavior(deliverableNameInput);
+    // 입력칸을 벗어나면(다른 곳 클릭·모달 이탈) 입력한 산출물을 목록에 반영한다.
+    deliverableNameInput.addEventListener("blur", () => {
+      commitDeliverableFromInputRow();
+    });
     queueMicrotask(() => refreshDeliverableHeaderUI());
   }
+  // 모달 안 다른 곳을 눌러도 입력 중이던 산출물을 반영한다.
+  taskModal.addEventListener("mousedown", (e) => {
+    if (!isDeliverableInputRowOpen()) return;
+    const target = e.target;
+    if (!(target instanceof HTMLElement)) return;
+    if (deliverableEditor instanceof HTMLElement && deliverableEditor.contains(target)) return;
+    if (btnDeliverableAddToggle instanceof HTMLElement && btnDeliverableAddToggle.contains(target)) return;
+    commitDeliverableFromInputRow();
+  });
   if (deliverableList) {
     deliverableList.addEventListener("click", (e) => {
       const target = e.target;
