@@ -332,6 +332,7 @@ body {
 
 .dot-legend__panel {
   position: relative;
+  overflow: visible;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--surface);
@@ -341,16 +342,19 @@ body {
 
 .dot-legend__title-row {
   display: flex;
-  justify-content: flex-end;
+  justify-content: flex-start;
   align-items: center;
   margin: 0 0 0.35rem;
 }
 
 .dot-legend__title {
-  font-size: 0.78rem;
-  font-weight: 800;
-  color: #334155;
-  letter-spacing: 0.02em;
+  /* 산출물 '삭제' 버튼과 동일 타이포, 색만 검정 */
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0;
+  color: #000000;
 }
 
 .dot-legend__heading {
@@ -374,13 +378,14 @@ body {
   max-width: 100%;
   cursor: help;
   border-bottom: 1px dotted #94a3b8;
+  outline: none;
 }
 
 .dot-legend__tip {
   position: absolute;
   left: 0;
-  bottom: calc(100% + 8px);
-  z-index: 40;
+  top: calc(100% + 8px);
+  z-index: 60;
   display: none;
   width: max-content;
   max-width: min(18rem, 70vw);
@@ -396,6 +401,7 @@ body {
   letter-spacing: 0;
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.22);
   pointer-events: none;
+  white-space: nowrap;
 }
 
 .dot-legend__heading--tip:hover .dot-legend__tip,
@@ -1223,7 +1229,7 @@ body.calendar-dragging {
 }
 
 .calendar-cell__dot-inner.calendar-cell__dot--done {
-  background: repeating-linear-gradient(135deg, #9ca3af 0 1px, #e5e7eb 1px 2px);
+  background: var(--dot-done);
 }
 
 .calendar-cell__dot-inner--late {

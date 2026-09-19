@@ -1311,7 +1311,7 @@
 
   function statusBarColor(status) {
     if (status === "on-going") return "#e8943a";
-    if (status === "done") return "repeating-linear-gradient(135deg, #94a3b8 0 1px, #e5e7eb 1px 3px)";
+    if (status === "done") return "#43a047";
     return "#8b95a5";
   }
 
@@ -1800,7 +1800,7 @@
       case "on-going":
         return "#e8943a";
       case "done":
-        return "repeating-linear-gradient(135deg, #94a3b8 0 1px, #e5e7eb 1px 3px)";
+        return "#43a047";
       default:
         return "#8b95a5";
     }
@@ -4214,7 +4214,7 @@
     if (location.protocol !== "http:" && location.protocol !== "https:") return;
     window.addEventListener("load", () => {
       navigator.serviceWorker
-        .register("sw.js?v=12")
+        .register("sw.js?v=13")
         .then((reg) => {
           reg.update().catch(() => {});
           if (reg.waiting) reg.waiting.postMessage({ type: "SKIP_WAITING" });
@@ -4224,8 +4224,8 @@
         });
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         // new SW took control — reload once so calendar layout code is fresh
-        if (sessionStorage.getItem("sw-reloaded-v12")) return;
-        sessionStorage.setItem("sw-reloaded-v12", "1");
+        if (sessionStorage.getItem("sw-reloaded-v13")) return;
+        sessionStorage.setItem("sw-reloaded-v13", "1");
         location.reload();
       });
     });
