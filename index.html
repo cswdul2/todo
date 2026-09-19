@@ -165,9 +165,20 @@
       </div>
 
       <div class="modal__section">
-        <h3 class="modal__section-title">예상산출물</h3>
+        <div class="modal__section-head">
+          <h3 class="modal__section-title">예상산출물</h3>
+          <button
+            type="button"
+            class="btn btn--ghost modal__section-add"
+            id="btnDeliverableAddToggle"
+            aria-controls="deliverableEditorHead"
+            aria-expanded="false"
+            aria-label="산출물 입력칸 열기"
+            title="산출물 입력칸 열기"
+          >➕</button>
+        </div>
         <div class="deliverable-editor" id="deliverableEditor">
-          <div class="deliverable-editor__head" id="deliverableEditorHead">
+          <div class="deliverable-editor__head" id="deliverableEditorHead" hidden>
             <span class="deliverable-editor__spacer" aria-hidden="true"></span>
             <textarea id="deliverableNameInput" class="deliverable-editor__name" rows="1" placeholder="산출물명 입력" spellcheck="false"></textarea>
             <select id="deliverableImportanceInput" class="deliverable-editor__importance" aria-label="산출물 중요도">
@@ -175,7 +186,7 @@
               <option value="medium">중</option>
               <option value="low">하</option>
             </select>
-            <button type="button" class="btn btn--ghost deliverable-editor__add" id="btnAddDeliverable" aria-label="산출물 추가">➕</button>
+            <button type="button" class="btn btn--ghost deliverable-editor__add" id="btnAddDeliverable" aria-label="산출물 추가 확정" title="추가 (Enter)">✔</button>
           </div>
           <ul class="deliverable-list" id="deliverableList"></ul>
         </div>
@@ -191,8 +202,7 @@
       <div class="modal__actions">
         <button type="button" class="btn btn--danger" id="btnDelete" hidden>삭제</button>
         <div class="modal__actions-right">
-          <button type="button" class="btn btn--ghost" id="btnUndo">되돌리기</button>
-          <button type="button" class="btn btn--primary" id="btnSave">완료</button>
+          <span class="modal__actions-hint">모달 바깥을 클릭하면 저장됩니다 · 되돌리기 Ctrl+Z</span>
         </div>
       </div>
     </div>

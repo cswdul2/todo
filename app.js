@@ -65,14 +65,13 @@
   const deliverableNameInput = document.getElementById("deliverableNameInput");
   const deliverableImportanceInput = document.getElementById("deliverableImportanceInput");
   const btnAddDeliverable = document.getElementById("btnAddDeliverable");
+  const btnDeliverableAddToggle = document.getElementById("btnDeliverableAddToggle");
   const deliverableEditorHead = document.getElementById("deliverableEditorHead");
   const deliverableList = document.getElementById("deliverableList");
   const taskStart = document.getElementById("taskStart");
   const taskEnd = document.getElementById("taskEnd");
   const taskRecurrence = document.getElementById("taskRecurrence");
   const modalTodayDisplay = document.getElementById("modalTodayDisplay");
-  const btnUndo = document.getElementById("btnUndo");
-  const btnSave = document.getElementById("btnSave");
   const btnDelete = document.getElementById("btnDelete");
   const existingTasksWrap = document.getElementById("existingTasksWrap");
   const existingTasksList = document.getElementById("existingTasksList");
@@ -811,6 +810,48 @@
     }
   }
 
+  function isDeliverableInputRowOpen() {
+    return deliverableEditorHead instanceof HTMLElement && !deliverableEditorHead.hidden;
+  }
+
+  /** 산출물 입력행은 「＋」를 누를 때만 열린다. */
+  function setDeliverableInputRowOpen(open, opts = {}) {
+    if (!(deliverableEditorHead instanceof HTMLElement)) return;
+    deliverableEditorHead.hidden = !open;
+    if (btnDeliverableAddToggle instanceof HTMLElement) {
+      btnDeliverableAddToggle.setAttribute("aria-expanded", open ? "true" : "false");
+      const label = open ? "산출물 입력칸 닫기" : "산출물 입력칸 열기";
+      btnDeliverableAddToggle.setAttribute("aria-label", label);
+      btnDeliverableAddToggle.title = label;
+    }
+    if (open) {
+      refreshDeliverableHeaderUI();
+      if (opts.focus && deliverableNameInput instanceof HTMLTextAreaElement) deliverableNameInput.focus();
+    }
+  }
+
+  function resetDeliverableInputRow() {
+    if (deliverableNameInput) deliverableNameInput.value = "";
+    if (deliverableImportanceInput) deliverableImportanceInput.value = "high";
+    setDeliverableInputRowOpen(false);
+  }
+
+  /** 입력행의 내용을 산출물 목록에 추가한다. */
+  function commitDeliverableFromInputRow() {
+    if (!deliverableNameInput || !deliverableImportanceInput) return;
+    const name = deliverableNameInput.value.trim();
+    if (!name) return;
+    const importanceRaw = deliverableImportanceInput.value;
+    const importance = importanceRaw === "high" || importanceRaw === "low" ? importanceRaw : "medium";
+    const current = collectDeliverablesFromModal();
+    current.push({ id: uuid(), name, importance, done: false, createdAt: Date.now() });
+    renderDeliverableList(current);
+    deliverableNameInput.value = "";
+    deliverableNameInput.focus();
+    refreshDeliverableHeaderUI();
+    updateActualEffortPreview();
+  }
+
   function bindDeliverableNameTextareaBehavior(ta) {
     ta.addEventListener("input", () => {
       fitDeliverableNameField(ta);
@@ -829,6 +870,7 @@
         if (e.key !== "Enter" || e.ctrlKey || e.altKey || e.metaKey) return;
         if (e.shiftKey) return;
         e.preventDefault();
+        commitDeliverableFromInputRow();
       }
     );
   }
@@ -1982,8 +2024,7 @@
     taskEffortValue.value = "";
     taskEffortUnit.value = "MH";
     if (taskActualEffortValue) taskActualEffortValue.value = "0MH";
-    if (deliverableNameInput) deliverableNameInput.value = "";
-    if (deliverableImportanceInput) deliverableImportanceInput.value = "high";
+    resetDeliverableInputRow();
     if (deliverableList) deliverableList.innerHTML = "";
     if (selectedDateStr) {
       taskStart.value = selectedDateStr;
@@ -2196,35 +2237,6 @@
     const effortInputRaw = (taskEffortValue.value || "").trim();
     const rows = collectDeliverablesFromModal();
     return !editingId && !title && !description && !effortInputRaw && rows.length === 0;
-  }
-
-  function restoreModalSnapshot() {
-    if (!modalSessionSnapshot) return;
-    tasks = cloneTasks(modalSessionSnapshot.tasks);
-    selectedDateStr = modalSessionSnapshot.selectedDateStr;
-    editingId = modalSessionSnapshot.editingId;
-    modalDefaultWhite = modalSessionSnapshot.modalDefaultWhite;
-    taskTitle.value = modalSessionSnapshot.form.title;
-    taskDescription.value = modalSessionSnapshot.form.description;
-    taskEffortValue.value = modalSessionSnapshot.form.effortValue;
-    taskEffortUnit.value = modalSessionSnapshot.form.effortUnit;
-    taskStart.value = modalSessionSnapshot.form.startDate;
-    taskEnd.value = modalSessionSnapshot.form.endDate;
-    taskRecurrence.value = modalSessionSnapshot.form.recurrence;
-    draftStatus = modalSessionSnapshot.form.status || "ready";
-    draftImportance = modalSessionSnapshot.form.importance || "medium";
-    if (deliverableNameInput) deliverableNameInput.value = modalSessionSnapshot.form.deliverableName || "";
-    if (deliverableImportanceInput) deliverableImportanceInput.value = modalSessionSnapshot.form.deliverableImportance || "high";
-    renderDeliverableList(modalSessionSnapshot.form.deliverables || []);
-    refreshDeliverableHeaderUI();
-    updateActualEffortPreview();
-    btnDelete.hidden = !editingId;
-    saveTasks().catch((err) => {
-      console.error("restore snapshot save error:", err);
-    });
-    applyModalTheme();
-    renderExistingTasksList();
-    renderCalendar();
   }
 
   function updateSearchResults() {
@@ -2525,8 +2537,7 @@
       taskEffortValue.value = t.effortValue != null && Number(t.effortValue) > 0 ? String(t.effortValue) : "";
       taskEffortUnit.value = t.effortUnit === "MD" ? "MD" : "MH";
       renderDeliverableList(getModalDeliverablesForDate(t, selectedDateStr));
-      if (deliverableNameInput) deliverableNameInput.value = "";
-      if (deliverableImportanceInput) deliverableImportanceInput.value = "high";
+      resetDeliverableInputRow();
       taskStart.value = t.startDate;
       taskEnd.value = t.endDate;
       taskRecurrence.value = t.recurrence || "none";
@@ -2549,8 +2560,7 @@
         taskEffortValue.value = "";
         taskEffortUnit.value = "MH";
         renderDeliverableList([]);
-        if (deliverableNameInput) deliverableNameInput.value = "";
-        if (deliverableImportanceInput) deliverableImportanceInput.value = "high";
+        resetDeliverableInputRow();
         taskStart.value = dateStr;
         taskEnd.value = dateStr;
         taskRecurrence.value = "none";
@@ -2579,8 +2589,7 @@
         taskEffortValue.value = "";
         taskEffortUnit.value = "MH";
         renderDeliverableList([]);
-        if (deliverableNameInput) deliverableNameInput.value = "";
-        if (deliverableImportanceInput) deliverableImportanceInput.value = "high";
+        resetDeliverableInputRow();
         taskStart.value = dateStr;
         taskEnd.value = dateStr;
         taskRecurrence.value = "none";
@@ -2656,8 +2665,7 @@
         taskEffortValue.value = t.effortValue != null && Number(t.effortValue) > 0 ? String(t.effortValue) : "";
         taskEffortUnit.value = t.effortUnit === "MD" ? "MD" : "MH";
         renderDeliverableList(getModalDeliverablesForDate(t, selectedDateStr));
-        if (deliverableNameInput) deliverableNameInput.value = "";
-        if (deliverableImportanceInput) deliverableImportanceInput.value = "high";
+        resetDeliverableInputRow();
         refreshDeliverableHeaderUI();
         updateActualEffortPreview();
         taskStart.value = t.startDate;
@@ -3342,19 +3350,18 @@
     taskEffortUnit.addEventListener("change", updateActualEffortPreview);
   }
   if (btnAddDeliverable) {
-    btnAddDeliverable.addEventListener("click", () => {
-      if (!deliverableNameInput || !deliverableImportanceInput) return;
-      const name = deliverableNameInput.value.trim();
-      if (!name) return;
-      const importanceRaw = deliverableImportanceInput.value;
-      const importance = importanceRaw === "high" || importanceRaw === "low" ? importanceRaw : "medium";
-      const current = collectDeliverablesFromModal();
-      current.push({ id: uuid(), name, importance, done: false, createdAt: Date.now() });
-      renderDeliverableList(current);
-      deliverableNameInput.value = "";
-      deliverableNameInput.focus();
-      refreshDeliverableHeaderUI();
-      updateActualEffortPreview();
+    btnAddDeliverable.addEventListener("click", commitDeliverableFromInputRow);
+  }
+  if (btnDeliverableAddToggle) {
+    btnDeliverableAddToggle.addEventListener("click", () => {
+      if (isDeliverableInputRowOpen()) {
+        // 입력한 내용이 있으면 먼저 목록에 추가하고, 비어 있으면 입력칸을 닫는다.
+        const pending = deliverableNameInput ? deliverableNameInput.value.trim() : "";
+        if (pending) commitDeliverableFromInputRow();
+        else setDeliverableInputRowOpen(false);
+        return;
+      }
+      setDeliverableInputRowOpen(true, { focus: true });
     });
   }
   if (deliverableImportanceInput) {
@@ -3658,7 +3665,7 @@
   searchInput.addEventListener("input", updateSearchResults);
   searchStatus.addEventListener("change", updateSearchResults);
 
-  btnUndo.addEventListener("click", restoreModalSnapshot);
+  // 모달 바깥 클릭 = 완료: 변경이 있으면 저장하고, 없으면 그냥 닫는다.
   modalBackdrop.addEventListener("click", () => {
     if (taskModal.hidden) return;
     if (isEffectivelyEmptyDraft()) {
@@ -3672,7 +3679,6 @@
     closeModal();
   });
 
-  btnSave.addEventListener("click", saveFromModal);
   btnDelete.addEventListener("click", deleteTask);
 
   document.addEventListener("keydown", (e) => {

@@ -2098,6 +2098,28 @@ body.calendar-dragging {
   color: var(--muted);
 }
 
+.modal__section-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.65rem;
+}
+
+.modal__section-head .modal__section-title {
+  margin: 0;
+}
+
+.modal__section-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
 .deliverable-editor {
   --deliverable-check-col: 1.35rem;
   --deliverable-importance-col: 5.5rem;
@@ -2107,6 +2129,11 @@ body.calendar-dragging {
   --deliverable-cell-pad-y: 0.35rem;
   display: grid;
   gap: 0.55rem;
+}
+
+/* hidden 속성이 display:grid 에 가려지지 않도록 */
+.deliverable-editor__head[hidden] {
+  display: none;
 }
 
 .deliverable-editor__head {
@@ -2665,8 +2692,16 @@ body.calendar-dragging {
 
 .modal__actions-right {
   display: flex;
+  align-items: center;
   gap: 0.6rem;
   margin-left: auto;
+}
+
+.modal__actions-hint {
+  font-size: 0.72rem;
+  color: var(--muted);
+  line-height: 1.35;
+  text-align: right;
 }
 
 .modal__inner--default .modal__actions {
