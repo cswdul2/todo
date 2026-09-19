@@ -28,12 +28,30 @@
           <option value="done">done</option>
         </select>
       </div>
-      <button type="button" class="btn-ocr" id="btnExport" title="일정 백업(JSON 내보내기)">💾 일정백업</button>
-      <button type="button" class="btn-ocr" id="btnImport" title="일정 복원(JSON 가져오기)">📂 일정복원</button>
-      <input type="file" id="importFileInput" accept="application/json,.json" hidden />
-      <button type="button" class="btn-ocr" id="btnOpenOcr" title="손글씨·사진 할일 목록 인식 (Gemini)">📷 사진 가져오기</button>
-      <button type="button" class="btn-ocr" id="btnOpenCamera" title="카메라로 촬영 후 할일 인식">🎥 바로 촬영</button>
-      <input type="file" id="cameraFileInput" accept="image/*" capture="environment" hidden />
+      <div class="toolbar__actions" role="toolbar" aria-label="일정 도구">
+        <button type="button" class="btn-ocr btn-ocr--icon" id="btnExport" title="일정 백업" aria-label="일정 백업">
+          <svg class="btn-ocr__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path fill="currentColor" d="M12 3a1 1 0 0 1 1 1v8.59l2.3-2.3a1 1 0 1 1 1.4 1.42l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.42L11 12.59V4a1 1 0 0 1 1-1Zm-7 14a1 1 0 0 1 1 1v1h12v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z"/>
+          </svg>
+        </button>
+        <button type="button" class="btn-ocr btn-ocr--icon" id="btnImport" title="일정 복원" aria-label="일정 복원">
+          <svg class="btn-ocr__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path fill="currentColor" d="M12 15a1 1 0 0 1-1-1V5.41L8.7 7.7a1 1 0 1 1-1.4-1.42l4-4a1 1 0 0 1 1.4 0l4 4a1 1 0 1 1-1.4 1.42L13 5.41V14a1 1 0 0 1-1 1Zm-7 2a1 1 0 0 1 1 1v1h12v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z"/>
+          </svg>
+        </button>
+        <input type="file" id="importFileInput" accept="application/json,.json" hidden />
+        <button type="button" class="btn-ocr btn-ocr--icon" id="btnOpenOcr" title="사진에서 할일 가져오기" aria-label="사진에서 할일 가져오기">
+          <svg class="btn-ocr__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path fill="currentColor" d="M4 5a2 2 0 0 1 2-2h3.2l.9 1.35A1 1 0 0 0 10.95 5H18a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5Zm8 3.5A4.5 4.5 0 1 0 16.5 13 4.5 4.5 0 0 0 12 8.5Zm0 2a2.5 2.5 0 1 1-2.5 2.5A2.5 2.5 0 0 1 12 10.5Z"/>
+          </svg>
+        </button>
+        <button type="button" class="btn-ocr btn-ocr--icon" id="btnOpenCamera" title="바로 촬영" aria-label="바로 촬영">
+          <svg class="btn-ocr__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path fill="currentColor" d="M9.4 4.2A1.5 1.5 0 0 1 10.7 3.5h2.6a1.5 1.5 0 0 1 1.3.7L15.4 6H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h2.6l.8-1.8ZM12 9.25A3.75 3.75 0 1 0 15.75 13 3.75 3.75 0 0 0 12 9.25Zm0 2a1.75 1.75 0 1 1-1.75 1.75A1.75 1.75 0 0 1 12 11.25Z"/>
+          </svg>
+        </button>
+        <input type="file" id="cameraFileInput" accept="image/*" capture="environment" hidden />
+      </div>
     </div>
 
     <header class="calendar-header">
@@ -49,6 +67,9 @@
 
     <div class="dot-legend" aria-label="달력 점 색·중요도 설명">
       <div class="dot-legend__panel">
+        <div class="dot-legend__title-row">
+          <span class="dot-legend__title">범례</span>
+        </div>
         <p class="dot-legend__heading">진행 상태</p>
         <div class="dot-legend__row">
           <span class="dot-legend__item"><span class="calendar-cell__dot calendar-cell__dot--ready"></span> ready</span>

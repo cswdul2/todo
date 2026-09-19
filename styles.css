@@ -36,13 +36,15 @@ body {
   max-width: 720px;
   margin: 0 auto;
   padding: 1.5rem 1rem 2rem;
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+  padding-bottom: max(2rem, env(safe-area-inset-bottom));
 }
 
 .toolbar {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  align-items: stretch;
-  gap: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
   margin-bottom: 1rem;
 }
 
@@ -51,9 +53,15 @@ body {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.5rem;
-  grid-column: 1 / -1;
   width: 100%;
   min-height: 2.375rem;
+}
+
+.toolbar__actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+  width: 100%;
 }
 
 /* 툴바: 검색 · 상태 · 오늘 높이·폰트 크기 통일 */
@@ -125,13 +133,51 @@ body {
   white-space: nowrap;
   flex-shrink: 0;
   box-sizing: border-box;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background 0.15s, border-color 0.15s, transform 0.12s, box-shadow 0.12s;
 }
 
 .btn-ocr:hover {
   background: #eef4ff;
   border-color: var(--accent);
   color: var(--accent);
+}
+
+.btn-ocr--icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  color: #334155;
+}
+
+.btn-ocr--icon:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.16);
+}
+
+.btn-ocr__icon {
+  width: 1.35rem;
+  height: 1.35rem;
+  display: block;
+  flex-shrink: 0;
+}
+
+#btnExport.btn-ocr--icon {
+  color: #4f46e5;
+}
+
+#btnImport.btn-ocr--icon {
+  color: #ca8a04;
+}
+
+#btnOpenOcr.btn-ocr--icon {
+  color: #0369a1;
+}
+
+#btnOpenCamera.btn-ocr--icon {
+  color: #7c3aed;
 }
 
 .search-results {
@@ -285,11 +331,26 @@ body {
 }
 
 .dot-legend__panel {
+  position: relative;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--surface);
   padding: 0.65rem 0.75rem 0.75rem;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.dot-legend__title-row {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin: 0 0 0.35rem;
+}
+
+.dot-legend__title {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #334155;
+  letter-spacing: 0.02em;
 }
 
 .dot-legend__heading {
@@ -301,7 +362,7 @@ body {
   letter-spacing: 0.04em;
 }
 
-.dot-legend__heading:not(:first-child) {
+.dot-legend__heading:not(:first-of-type) {
   margin-top: 0.65rem;
   padding-top: 0.55rem;
   border-top: 1px dashed var(--border);
@@ -3054,21 +3115,29 @@ body.calendar-dragging {
   .app {
     max-width: 100%;
     padding: 1rem 0.7rem 1.2rem;
+    padding-left: max(0.7rem, env(safe-area-inset-left));
+    padding-right: max(0.7rem, env(safe-area-inset-right));
+    padding-bottom: max(1.2rem, env(safe-area-inset-bottom));
   }
 
   .toolbar {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
     gap: 0.5rem;
-    align-items: stretch;
   }
 
-  .toolbar > .toolbar__search {
-    grid-column: 1 / -1;
-    width: 100%;
+  .toolbar__actions {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.4rem;
   }
 
-  .btn-ocr,
+  .btn-ocr--icon {
+    min-height: 2.45rem;
+  }
+
+  .btn-ocr__icon {
+    width: 1.28rem;
+    height: 1.28rem;
+  }
+
   .btn-today {
     display: block;
     width: 100%;
@@ -3120,12 +3189,20 @@ body.calendar-dragging {
   }
 
   .dot-legend__panel {
-    padding: 0.55rem 0.6rem 0.65rem;
+    padding: 0.5rem 0.55rem 0.6rem;
+  }
+
+  .dot-legend__title {
+    font-size: 0.74rem;
   }
 
   .dot-legend__row {
-    gap: 0.35rem 0.65rem;
-    font-size: 0.69rem;
+    gap: 0.35rem 0.55rem;
+    font-size: 0.66rem;
+  }
+
+  .dot-legend__item {
+    max-width: 100%;
   }
 
   .modal {
@@ -3188,7 +3265,15 @@ body.calendar-dragging {
     min-width: 0;
   }
 
-  .btn-ocr,
+  .btn-ocr--icon {
+    min-height: 2.55rem;
+  }
+
+  .btn-ocr__icon {
+    width: 1.22rem;
+    height: 1.22rem;
+  }
+
   .btn-today {
     padding: 0.34rem 0.45rem;
     font-size: 0.76rem;
@@ -3254,13 +3339,20 @@ body.calendar-dragging {
 @media (max-width: 420px) {
   .app {
     padding: 0.75rem 0.5rem 1rem;
+    padding-left: max(0.5rem, env(safe-area-inset-left));
+    padding-right: max(0.5rem, env(safe-area-inset-right));
+    padding-bottom: max(1rem, calc(env(safe-area-inset-bottom) + 0.5rem));
   }
 
-  .toolbar {
-    grid-template-columns: 1fr;
+  .toolbar__actions {
+    gap: 0.35rem;
   }
 
-  .btn-ocr,
+  .btn-ocr--icon {
+    min-height: 2.6rem;
+    border-radius: 10px;
+  }
+
   .btn-today {
     font-size: 0.74rem;
     min-height: 2.05rem;
@@ -3268,6 +3360,27 @@ body.calendar-dragging {
 
   .month-title {
     font-size: 0.98rem;
+  }
+
+  .calendar-cell {
+    min-height: 58px;
+    overflow: hidden;
+  }
+
+  .calendar-cell__ongoing-count {
+    max-width: calc(100% - 1.4rem);
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .dot-legend__heading {
+    font-size: 0.64rem;
+    line-height: 1.35;
+  }
+
+  .dot-legend__row {
+    gap: 0.3rem 0.45rem;
+    font-size: 0.62rem;
   }
 
   .deliverable-editor {
