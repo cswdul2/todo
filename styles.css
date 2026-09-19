@@ -803,7 +803,7 @@ body.calendar-dragging {
 .calendar-cell__dots {
   margin-top: 0;
   position: relative;
-  z-index: 2;
+  z-index: 20;
   display: flex;
   flex-wrap: wrap;
   align-items: center;

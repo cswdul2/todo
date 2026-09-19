@@ -1956,6 +1956,16 @@
     const DOT_GAP_PX = 20;
     const SPACER_MARGIN_TOP = 4;
     const SPACER_MARGIN_BOTTOM = 12;
+    const DOTS_MIN_PX = 28;
+
+    const estimateDotsHeight = (cell, ds) => {
+      const dotsEl = /** @type {HTMLElement | null} */ (cell.querySelector(".calendar-cell__dots"));
+      const measured = dotsEl ? dotsEl.offsetHeight : 0;
+      if (measured > 0) return measured;
+      const count = tasks.filter((t) => taskCoversDate(t, ds)).length;
+      // ~4 dots per row on narrow phones, ~14px per row
+      return Math.max(DOTS_MIN_PX, Math.ceil(Math.max(count, 1) / 3) * 14);
+    };
 
     const syncCellSpacers = (preserveBoost) => {
       allCells.forEach((cell, idx) => {
@@ -1977,8 +1987,6 @@
         const barBottomRel = dateBarBottomAbsMap.has(ds)
           ? dateBarBottomAbsMap.get(ds) - cell.offsetTop
           : rowBase + stackPx;
-        // dotsTop ~= spacerStart + spacerH + SPACER_MARGIN_BOTTOM
-        // require: barBottomRel + DOT_GAP_PX <= dotsTop
         const needSpacer = Math.max(
           0,
           Math.ceil(barBottomRel + DOT_GAP_PX - spacerStart - SPACER_MARGIN_BOTTOM),
@@ -1996,60 +2004,96 @@
       });
     };
 
+    /** 셀 콘텐츠(헤더+spacer+dots)와 바 하단을 모두 덮는 행 높이 강제 */
+    const forceRowHeightsForBarsAndDots = (extraByRow = {}) => {
+      const rowCount = Math.ceil(allCells.length / 7);
+      const heights = [];
+      for (let row = 0; row < rowCount; row++) {
+        let need = 108;
+        const inRow = allCells.slice(row * 7, row * 7 + 7);
+        inRow.forEach((cell) => {
+          const ds = cell.dataset.dateStr || "";
+          const dotsH = estimateDotsHeight(cell, ds);
+          const barBottomRel = dateBarBottomAbsMap.has(ds)
+            ? dateBarBottomAbsMap.get(ds) - cell.offsetTop
+            : 0;
+          const scrollH = cell.scrollHeight || 0;
+          const contentH = Math.max(
+            scrollH,
+            barBottomRel + DOT_GAP_PX + dotsH + 12,
+            (rowBaseTop[row] || HEADER_BASE_PX) +
+              ((rowLaneMax[row] || 0) > 0
+                ? BAR_HEIGHT + ((rowLaneMax[row] || 1) - 1) * LINE_STEP
+                : 0) +
+              DOT_GAP_PX +
+              dotsH +
+              12
+          );
+          if (contentH > need) need = contentH;
+        });
+        need += extraByRow[row] || 0;
+        heights.push(`${Math.ceil(need)}px`);
+      }
+      calendarGrid.style.gridTemplateRows = heights.join(" ");
+    };
+
     syncCellSpacers(!!finalPass);
+    // spacer 반영 후 레이아웃을 한 번 읽어야 scrollHeight가 맞다
+    void calendarGrid.offsetHeight;
+    forceRowHeightsForBarsAndDots();
 
     if (!finalPass) {
-      /** @type {Record<number, number>} */
-      const rowOverflowPx = {};
-      allCells.forEach((cell, idx) => {
-        const ds = cell.dataset.dateStr || "";
-        if (!ds) return;
-        const barBottomAbs = dateBarBottomAbsMap.get(ds);
-        if (barBottomAbs == null) return;
-        const row = Math.floor(idx / 7);
-        const dotsEl = /** @type {HTMLElement | null} */ (cell.querySelector(".calendar-cell__dots"));
-        const dotsTop = dotsEl ? dotsEl.offsetTop : cell.offsetHeight;
-        const bottomReserve = Math.max(0, cell.offsetHeight - dotsTop);
-        const barBottomRel = barBottomAbs - cell.offsetTop;
-        const requiredHeight = barBottomRel + DOT_GAP_PX + bottomReserve;
-        const overflow = Math.ceil(requiredHeight - cell.offsetHeight);
-        if (overflow > 0) rowOverflowPx[row] = Math.max(rowOverflowPx[row] || 0, overflow);
-      });
-      applyCalendarRowHeights(rowSlots, rowLaneMax, cellLaneMap, rowOverflowPx, rowBaseTop, LINE_STEP, BAR_HEIGHT);
       requestAnimationFrame(() => renderMultiDayRangeLines(true));
       return;
     }
 
-    // final pass: viewport 좌표로 실제 겹침 측정 (offsetTop 오차 방지)
+    // final pass: 바가 점을 가리거나, 점이 셀 밖으로 잘리면 행을 더 키운다
     if (barDotLayoutFixAttempts < 24) {
       /** @type {Record<number, number>} */
-      const overlapByRow = {};
+      const growByRow = {};
       /** @type {Map<string, number>} */
       const spacerBoostByDate = new Map();
       const lines = [...layer.querySelectorAll(".calendar-range-line")];
-      const lineRects = lines.map((line) => ({ el: line, r: line.getBoundingClientRect() }));
+      const lineRects = lines.map((line) => line.getBoundingClientRect());
       allCells.forEach((cell, idx) => {
         const row = Math.floor(idx / 7);
         const ds = cell.dataset.dateStr || "";
         const dotsEl = /** @type {HTMLElement | null} */ (cell.querySelector(".calendar-cell__dots"));
-        if (!dotsEl) return;
+        if (!dotsEl || !ds) return;
         const cellRect = cell.getBoundingClientRect();
         const dotsRect = dotsEl.getBoundingClientRect();
-        let maxBottomInCell = -Infinity;
-        lineRects.forEach(({ r }) => {
+        let maxBarBottom = -Infinity;
+        lineRects.forEach((r) => {
           if (r.bottom <= cellRect.top || r.top >= cellRect.bottom) return;
           if (r.right <= cellRect.left || r.left >= cellRect.right) return;
-          if (r.bottom > maxBottomInCell) maxBottomInCell = r.bottom;
+          if (r.bottom > maxBarBottom) maxBarBottom = r.bottom;
         });
-        if (!Number.isFinite(maxBottomInCell)) return;
-        const overlap = Math.ceil(maxBottomInCell + DOT_GAP_PX - dotsRect.top);
-        if (overlap > 0) {
-          overlapByRow[row] = Math.max(overlapByRow[row] || 0, overlap);
-          if (ds) spacerBoostByDate.set(ds, Math.max(spacerBoostByDate.get(ds) || 0, overlap));
+
+        let grow = 0;
+        // 1) 점이 셀 밖으로 밀림
+        if (dotsRect.bottom > cellRect.bottom + 0.5) {
+          grow = Math.max(grow, Math.ceil(dotsRect.bottom - cellRect.bottom + 16));
+        }
+        // 2) 바가 점 영역을 침범
+        if (Number.isFinite(maxBarBottom) && maxBarBottom + DOT_GAP_PX > dotsRect.top) {
+          grow = Math.max(grow, Math.ceil(maxBarBottom + DOT_GAP_PX - dotsRect.top));
+        }
+        // 3) 점 높이가 셀 안에 확보되지 않음 (바가 바닥까지 찬 경우)
+        const dotsH = estimateDotsHeight(cell, ds);
+        const roomBelowBars = Number.isFinite(maxBarBottom)
+          ? cellRect.bottom - maxBarBottom
+          : cellRect.height;
+        if (roomBelowBars < dotsH + DOT_GAP_PX) {
+          grow = Math.max(grow, Math.ceil(dotsH + DOT_GAP_PX - roomBelowBars));
+        }
+
+        if (grow > 0) {
+          growByRow[row] = Math.max(growByRow[row] || 0, grow);
+          spacerBoostByDate.set(ds, Math.max(spacerBoostByDate.get(ds) || 0, grow));
         }
       });
 
-      if (Object.keys(overlapByRow).length > 0) {
+      if (Object.keys(growByRow).length > 0) {
         spacerBoostByDate.forEach((boost, ds) => {
           const cell = cellByDate.get(ds);
           if (!cell) return;
@@ -2058,26 +2102,19 @@
             parseFloat(cell.style.getPropertyValue("--range-stack-px")) || 0,
             spacerEl ? parseFloat(spacerEl.style.height) || 0 : 0
           );
-          const next = cur + boost + 12;
+          const next = cur + boost;
           cell.style.setProperty("--range-stack-px", `${next}px`);
           if (spacerEl) spacerEl.style.height = `${next}px`;
         });
-        const currentRows = getComputedStyle(calendarGrid)
-          .gridTemplateRows.split(" ")
-          .map((x) => parseFloat(x) || 0);
-        const rowCount = Math.ceil(allCells.length / 7);
-        const nextRows = [];
-        for (let row = 0; row < rowCount; row++) {
-          const base = currentRows[row] || 0;
-          nextRows.push(`${base + (overlapByRow[row] || 0) + 32}px`);
-        }
-        calendarGrid.style.gridTemplateRows = nextRows.join(" ");
+        void calendarGrid.offsetHeight;
+        forceRowHeightsForBarsAndDots(growByRow);
         barDotLayoutFixAttempts += 1;
         requestAnimationFrame(() => renderMultiDayRangeLines(true));
         return;
       }
     }
   }
+
 
 
   /**
@@ -4161,7 +4198,7 @@
     if (location.protocol !== "http:" && location.protocol !== "https:") return;
     window.addEventListener("load", () => {
       navigator.serviceWorker
-        .register("sw.js?v=7")
+        .register("sw.js?v=8")
         .then((reg) => {
           reg.update().catch(() => {});
           if (reg.waiting) reg.waiting.postMessage({ type: "SKIP_WAITING" });
@@ -4171,8 +4208,8 @@
         });
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         // new SW took control — reload once so calendar layout code is fresh
-        if (sessionStorage.getItem("sw-reloaded-v7")) return;
-        sessionStorage.setItem("sw-reloaded-v7", "1");
+        if (sessionStorage.getItem("sw-reloaded-v8")) return;
+        sessionStorage.setItem("sw-reloaded-v8", "1");
         location.reload();
       });
     });
