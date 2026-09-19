@@ -17,7 +17,7 @@
    * @property {'high'|'medium'|'low'} importance
   * @property {number | null} effortValue
   * @property {'MH'|'MD'} effortUnit
-  * @property {Array<{id: string, name: string, importance: 'high'|'medium'|'low', done: boolean, createdAt?: number | null}>} deliverables
+  * @property {Array<{id: string, name: string, importance: 'high'|'medium'|'low', done: boolean, completedAt?: string | null, createdAt?: number | null}>} deliverables
  * @property {Record<string, Record<string, boolean>> | undefined} recurrenceProgress
  * @property {string[] | undefined} recurrenceSkipStarts
    */
@@ -157,7 +157,7 @@
   let lastPointerClientY = -1;
   let suppressRangeClickTaskId = null;
   let suppressRangeClickUntil = 0;
-  /** @type {null | { tasks: Task[], selectedDateStr: string | null, editingId: string | null, modalDefaultWhite: boolean, form: { title: string, description: string, effortValue: string, effortUnit: string, startDate: string, endDate: string, recurrence: 'none'|'daily'|'weekly'|'monthly', status: string, importance: string, deliverables: Array<{id: string, name: string, importance: 'high'|'medium'|'low', done: boolean, createdAt?: number | null}>, deliverableName: string, deliverableImportance: string } }} */
+  /** @type {null | { tasks: Task[], selectedDateStr: string | null, editingId: string | null, modalDefaultWhite: boolean, form: { title: string, description: string, effortValue: string, effortUnit: string, startDate: string, endDate: string, recurrence: 'none'|'daily'|'weekly'|'monthly', status: string, importance: string, deliverables: Array<{id: string, name: string, importance: 'high'|'medium'|'low', done: boolean, completedAt?: string | null, createdAt?: number | null}>, deliverableName: string, deliverableImportance: string } }} */
   let modalSessionSnapshot = null;
   const RECURRENCE_ALERT_STATE_KEY = "calendar-app-recurrence-alert-state-v1";
   let recurrenceWatchTimer = null;
@@ -739,6 +739,31 @@
   const DELIVERABLE_NAME_MAX_LINES = 5;
 
   /** @returns {'high'|'medium'|'low'} */
+
+  function normalizeCompletedAtDate(raw) {
+    if (raw == null) return null;
+    const s = String(raw).trim().slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+    return s;
+  }
+
+  /** 완료날짜가 있으면 그 날짜 기준으로 완료. 구버전 done만 있으면 전 기간 완료로 본다. */
+  function isDeliverableCompleteOnDate(row, dateStr) {
+    if (!row) return false;
+    const completedAt = normalizeCompletedAtDate(row.completedAt);
+    if (completedAt) {
+      if (!dateStr) return true;
+      return completedAt <= dateStr;
+    }
+    return !!row.done;
+  }
+
+  function isDeliverableComplete(row) {
+    if (!row) return false;
+    if (normalizeCompletedAtDate(row.completedAt)) return true;
+    return !!row.done;
+  }
+
   function deliverableNormalizedImportance(importanceRaw) {
     return importanceRaw === "high" || importanceRaw === "low" ? importanceRaw : "medium";
   }
@@ -907,7 +932,7 @@
     const newId = uuid();
     const fromEl = deliverableEditorHead;
     const current = collectDeliverablesFromModal();
-    current.push({ id: newId, name, importance, done: false, createdAt: Date.now() });
+    current.push({ id: newId, name, importance, done: false, completedAt: null, createdAt: Date.now() });
     deliverableCommitBusy = true;
     renderDeliverableList(current);
     const toEl = deliverableList
@@ -1008,11 +1033,14 @@
         if (!name) return null;
         const importance = row && (row.importance === "high" || row.importance === "low") ? row.importance : "medium";
         const id = row && row.id ? String(row.id) : `d-${Date.now()}-${idx}`;
+        const completedAt = normalizeCompletedAtDate(row && row.completedAt);
+        const done = !!completedAt || !!(row && row.done);
         return {
           id,
           name,
           importance,
-          done: !!(row && row.done),
+          done,
+          completedAt,
           createdAt: normalizeDeliverableCreatedAt(row && row.createdAt, id),
         };
       })
@@ -1026,8 +1054,9 @@
     Object.entries(progressRaw).forEach(([occStart, row]) => {
       if (!row || typeof row !== "object") return;
       const item = {};
-      Object.entries(row).forEach(([id, done]) => {
-        item[String(id)] = !!done;
+      Object.entries(row).forEach(([id, val]) => {
+        if (typeof val === "string" && normalizeCompletedAtDate(val)) item[String(id)] = normalizeCompletedAtDate(val);
+        else item[String(id)] = !!val;
       });
       if (Object.keys(item).length) out[String(occStart)] = item;
     });
@@ -1043,12 +1072,21 @@
       if (occ && occ.start !== task.startDate) {
         const progress = cloneRecurrenceProgress(task.recurrenceProgress);
         const rowState = progress[occ.start] || {};
-        viewRows = rows.map((r) => ({ ...r, done: !!rowState[r.id] }));
+        viewRows = rows.map((r) => {
+          const state = rowState[r.id];
+          if (typeof state === "string") {
+            const completedAt = normalizeCompletedAtDate(state);
+            return { ...r, completedAt, done: !!completedAt };
+          }
+          return { ...r, done: !!state, completedAt: r.completedAt || null };
+        });
       }
     }
     const totalWeight = viewRows.reduce((acc, row) => acc + importanceWeight(row.importance), 0);
     if (totalWeight <= 0) return 0;
-    const doneWeight = viewRows.filter((row) => row.done).reduce((acc, row) => acc + importanceWeight(row.importance), 0);
+    const doneWeight = viewRows
+      .filter((row) => isDeliverableCompleteOnDate(row, dateStr))
+      .reduce((acc, row) => acc + importanceWeight(row.importance), 0);
     return Math.max(0, Math.min(1, doneWeight / totalWeight));
   }
 
@@ -1057,7 +1095,7 @@
     if (!rows.length) return task.status === "done" ? 1 : 0;
     const totalWeight = rows.reduce((acc, row) => acc + importanceWeight(row.importance), 0);
     if (totalWeight <= 0) return 0;
-    const doneWeight = rows.filter((row) => row.done).reduce((acc, row) => acc + importanceWeight(row.importance), 0);
+    const doneWeight = rows.filter((row) => isDeliverableComplete(row)).reduce((acc, row) => acc + importanceWeight(row.importance), 0);
     return Math.max(0, Math.min(1, doneWeight / totalWeight));
   }
 
@@ -1094,10 +1132,17 @@
     const rows = normalizeDeliverables(task ? task.deliverables : []);
     if (!task || !isNonInitialRecurrenceOccurrence(task, dateStr)) return rows;
     const occ = getOccurrenceContaining(task, dateStr);
-    if (!occ) return rows.map((row) => ({ ...row, done: false }));
+    if (!occ) return rows.map((row) => ({ ...row, done: false, completedAt: null }));
     const progress = cloneRecurrenceProgress(task.recurrenceProgress);
     const rowState = progress[occ.start] || {};
-    return rows.map((row) => ({ ...row, done: !!rowState[row.id] }));
+    return rows.map((row) => {
+      const state = rowState[row.id];
+      if (typeof state === "string") {
+        const completedAt = normalizeCompletedAtDate(state);
+        return { ...row, completedAt, done: !!completedAt };
+      }
+      return { ...row, done: !!state, completedAt: null };
+    });
   }
 
   function formatMh(v) {
@@ -1255,9 +1300,9 @@
 
   function canSetDoneStatusFromModal() {
     if (!deliverableList) return true;
-    const checks = deliverableList.querySelectorAll('.deliverable-item input[type="checkbox"]');
-    if (!checks.length) return true;
-    return Array.from(checks).every((el) => el instanceof HTMLInputElement && el.checked);
+    const dates = deliverableList.querySelectorAll(".deliverable-item__completed-at");
+    if (!dates.length) return true;
+    return Array.from(dates).every((el) => el instanceof HTMLInputElement && !!normalizeCompletedAtDate(el.value));
   }
 
   async function enforceDoneStatusConstraint() {
@@ -1285,7 +1330,7 @@
   async function autoPromoteDoneStatusWhenEligible() {
     const rows = collectDeliverablesFromModal();
     if (!rows.length) return;
-    if (!rows.every((row) => !!row.done)) return;
+    if (!rows.every((row) => isDeliverableComplete(row))) return;
     const current = getCurrentStatus();
     if (current === "done") return;
 
@@ -1309,9 +1354,9 @@
   async function autoPromoteOngoingWhenStarted() {
     const rows = collectDeliverablesFromModal();
     if (!rows.length) return;
-    const anyDone = rows.some((row) => !!row.done);
+    const anyDone = rows.some((row) => isDeliverableComplete(row));
     if (!anyDone) return;
-    const allDone = rows.every((row) => !!row.done);
+    const allDone = rows.every((row) => isDeliverableComplete(row));
     if (allDone) return;
     const current = getCurrentStatus();
     if (current !== "ready") return;
@@ -2127,12 +2172,15 @@
       const importanceRaw = impSelect instanceof HTMLSelectElement ? impSelect.value : "medium";
       if (!name) return;
       const importance = importanceRaw === "high" || importanceRaw === "low" ? importanceRaw : "medium";
-      const cb = row.querySelector('input[type="checkbox"]');
+      const dateEl = row.querySelector(".deliverable-item__completed-at");
+      const completedAt =
+        dateEl instanceof HTMLInputElement ? normalizeCompletedAtDate(dateEl.value) : null;
       out.push({
         id: row.getAttribute("data-id") || `d-${Date.now()}-${idx}`,
         name,
         importance,
-        done: cb instanceof HTMLInputElement ? cb.checked : false,
+        done: !!completedAt,
+        completedAt,
         createdAt: normalizeDeliverableCreatedAt(row.getAttribute("data-created-at"), row.getAttribute("data-id")),
       });
     });
@@ -2155,15 +2203,19 @@
     deliverableList.innerHTML = "";
     sortDeliverablesForView(normalizeDeliverables(rows)).forEach((row) => {
       const li = document.createElement("li");
-      li.className = "deliverable-item" + (row.done ? " deliverable-item--done" : "");
+      const completedAt = normalizeCompletedAtDate(row.completedAt);
+      const isDone = !!completedAt || !!row.done;
+      li.className = "deliverable-item" + (isDone ? " deliverable-item--done" : "");
       li.setAttribute("data-id", row.id || uuid());
       if (Number.isFinite(row.createdAt) && Number(row.createdAt) > 0) {
         li.setAttribute("data-created-at", String(Math.floor(Number(row.createdAt))));
       }
-      const cb = document.createElement("input");
-      cb.type = "checkbox";
-      cb.checked = !!row.done;
-      cb.setAttribute("aria-label", "산출물 완료 여부");
+      const dateInput = document.createElement("input");
+      dateInput.type = "date";
+      dateInput.className = "deliverable-item__completed-at";
+      dateInput.value = completedAt || "";
+      dateInput.title = "산출물 생산완료일자";
+      dateInput.setAttribute("aria-label", "산출물 생산완료일자");
 
       const nameTa = document.createElement("textarea");
       nameTa.className = "deliverable-item__name-input";
@@ -2182,7 +2234,7 @@
       delBtn.className = "deliverable-item__delete";
       delBtn.textContent = "삭제";
 
-      li.appendChild(cb);
+      li.appendChild(dateInput);
       li.appendChild(nameTa);
       li.appendChild(impSelect);
       li.appendChild(delBtn);
@@ -2202,7 +2254,7 @@
     const expectedMh = effortUnit === "MD" ? effortRaw * 24 : effortRaw;
     const rows = collectDeliverablesFromModal();
     const totalWeight = rows.reduce((acc, row) => acc + importanceWeight(row.importance), 0);
-    const doneWeight = rows.filter((row) => row.done).reduce((acc, row) => acc + importanceWeight(row.importance), 0);
+    const doneWeight = rows.filter((row) => isDeliverableComplete(row)).reduce((acc, row) => acc + importanceWeight(row.importance), 0);
     const ratio = totalWeight > 0 ? doneWeight / totalWeight : 0;
     const actualMh = expectedMh * ratio;
     const viewValue = effortUnit === "MD" ? actualMh / 24 : actualMh;
@@ -2279,7 +2331,8 @@
       id: String(r.id || ""),
       name: String(r.name || ""),
       importance: r.importance === "high" || r.importance === "low" ? r.importance : "medium",
-      done: !!r.done,
+      done: isDeliverableComplete(r),
+      completedAt: normalizeCompletedAtDate(r.completedAt),
       createdAt: Number.isFinite(Number(r.createdAt)) ? Math.floor(Number(r.createdAt)) : null,
     }));
   }
@@ -3753,10 +3806,12 @@
       if (!(target instanceof HTMLElement)) return;
       const item = target.closest(".deliverable-item");
       if (!(item instanceof HTMLElement)) return;
-      const cb = item.querySelector('input[type="checkbox"]');
-      item.classList.toggle("deliverable-item--done", cb instanceof HTMLInputElement ? cb.checked : false);
+      const dateEl = item.querySelector(".deliverable-item__completed-at");
+      const done = dateEl instanceof HTMLInputElement && !!normalizeCompletedAtDate(dateEl.value);
+      item.classList.toggle("deliverable-item--done", done);
       renderQuickMetaControls();
       updateActualEffortPreview();
+      renderCalendar();
     });
     deliverableList.addEventListener("input", (e) => {
       const target = e.target;
@@ -4102,7 +4157,7 @@
     if (location.protocol !== "http:" && location.protocol !== "https:") return;
     window.addEventListener("load", () => {
       navigator.serviceWorker
-        .register("sw.js?v=9")
+        .register("sw.js?v=10")
         .then((reg) => {
           reg.update().catch(() => {});
           if (reg.waiting) reg.waiting.postMessage({ type: "SKIP_WAITING" });
@@ -4112,8 +4167,8 @@
         });
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         // new SW took control — reload once so calendar layout code is fresh
-        if (sessionStorage.getItem("sw-reloaded-v9")) return;
-        sessionStorage.setItem("sw-reloaded-v9", "1");
+        if (sessionStorage.getItem("sw-reloaded-v10")) return;
+        sessionStorage.setItem("sw-reloaded-v10", "1");
         location.reload();
       });
     });

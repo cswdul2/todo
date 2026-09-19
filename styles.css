@@ -2283,8 +2283,8 @@ body.calendar-dragging {
 }
 
 .deliverable-editor {
-  --deliverable-check-col: 1.35rem;
-  --deliverable-importance-col: 5.5rem;
+  --deliverable-date-col: 7.6rem;
+  --deliverable-importance-col: 3.15rem;
   --deliverable-action-col: 2.95rem;
   --deliverable-row-h: 2.2rem;
   --deliverable-cell-pad-x: 0.45rem;
@@ -2300,7 +2300,7 @@ body.calendar-dragging {
 
 .deliverable-editor__head {
   display: grid;
-  grid-template-columns: var(--deliverable-check-col) 1fr var(--deliverable-importance-col) var(--deliverable-action-col);
+  grid-template-columns: var(--deliverable-date-col) 1fr var(--deliverable-importance-col) var(--deliverable-action-col);
   gap: 0.45rem;
   align-items: center;
   padding: var(--deliverable-cell-pad-y) var(--deliverable-cell-pad-x);
@@ -2393,7 +2393,7 @@ body.calendar-dragging {
 }
 
 .deliverable-editor__spacer {
-  width: var(--deliverable-check-col);
+  width: var(--deliverable-date-col);
   min-height: var(--deliverable-row-h);
   align-self: center;
 }
@@ -2402,6 +2402,7 @@ body.calendar-dragging {
 .deliverable-editor__name,
 .deliverable-editor__importance,
 .deliverable-editor__add,
+.deliverable-item__completed-at,
 .deliverable-item__name-input,
 .deliverable-item__importance-select,
 .deliverable-item__delete {
@@ -2473,7 +2474,7 @@ body.calendar-dragging {
 
 .deliverable-item {
   display: grid;
-  grid-template-columns: var(--deliverable-check-col) 1fr var(--deliverable-importance-col) var(--deliverable-action-col);
+  grid-template-columns: var(--deliverable-date-col) 1fr var(--deliverable-importance-col) var(--deliverable-action-col);
   gap: 0.45rem;
   align-items: center;
   padding: var(--deliverable-cell-pad-y) var(--deliverable-cell-pad-x);
@@ -2497,12 +2498,19 @@ body.calendar-dragging {
   border-color: #cbd5e1;
 }
 
-.deliverable-item input[type="checkbox"] {
-  width: 1.05rem;
-  height: 1.05rem;
+.deliverable-item__completed-at {
+  width: 100%;
+  min-width: 0;
   margin: 0;
-  align-self: center;
-  justify-self: center;
+  padding: 0 0.22rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.95);
+  color: #0f172a;
+  font: inherit;
+  font-size: 0.68rem;
+  line-height: calc(var(--deliverable-row-h) - 2px);
+  box-sizing: border-box;
 }
 
 .deliverable-item__name-input {
@@ -3127,8 +3135,8 @@ body.calendar-dragging {
   }
 
   .deliverable-editor {
-    --deliverable-check-col: 1.2rem;
-    --deliverable-importance-col: 4.7rem;
+    --deliverable-date-col: 6.8rem;
+    --deliverable-importance-col: 2.85rem;
     --deliverable-action-col: 2.55rem;
     --deliverable-row-h: 1.9rem;
     --deliverable-cell-pad-x: 0.3rem;
@@ -3159,10 +3167,6 @@ body.calendar-dragging {
     gap: 0.36rem;
   }
 
-  .deliverable-item input[type="checkbox"] {
-    width: 0.96rem;
-    height: 0.96rem;
-  }
 
   .deliverable-item__name-input {
     font-size: 0.8rem;
@@ -3459,8 +3463,8 @@ body.calendar-dragging {
   }
 
   .deliverable-editor {
-    --deliverable-check-col: 1.05rem;
-    --deliverable-importance-col: 4.25rem;
+    --deliverable-date-col: 6.2rem;
+    --deliverable-importance-col: 2.6rem;
     --deliverable-action-col: 2.3rem;
     --deliverable-row-h: 1.74rem;
     --deliverable-cell-pad-x: 0.22rem;
@@ -3491,10 +3495,6 @@ body.calendar-dragging {
     gap: 0.3rem;
   }
 
-  .deliverable-item input[type="checkbox"] {
-    width: 0.9rem;
-    height: 0.9rem;
-  }
 
   .deliverable-item__name-input {
     font-size: 0.77rem;
