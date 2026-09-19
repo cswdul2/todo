@@ -3613,6 +3613,18 @@ body.calendar-dragging {
   cursor: default;
 }
 
+.date-pop__day--muted {
+  opacity: 0.48;
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.date-pop__day--muted.date-pop__day--in-range,
+.date-pop__day--muted.date-pop__day--range-start,
+.date-pop__day--muted.date-pop__day--range-end {
+  opacity: 0.85;
+}
+
 .date-pop__day--sun {
   color: var(--sun);
 }

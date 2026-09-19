@@ -2216,6 +2216,17 @@
       dateInput.value = completedAt || "";
       dateInput.title = "산출물 생산완료일자";
       dateInput.setAttribute("aria-label", "산출물 생산완료일자");
+      const seedTaskStartDate = () => {
+        if (dateInput.value) return;
+        const start =
+          (taskStart instanceof HTMLInputElement && taskStart.value) ||
+          getEditingTask()?.startDate ||
+          selectedDateStr ||
+          "";
+        if (start) dateInput.value = start;
+      };
+      dateInput.addEventListener("pointerdown", seedTaskStartDate);
+      dateInput.addEventListener("focus", seedTaskStartDate);
 
       const nameTa = document.createElement("textarea");
       nameTa.className = "deliverable-item__name-input";
@@ -3588,6 +3599,15 @@
         if (!(day instanceof HTMLElement) || !day.dataset.date) return;
         if (datePopDrag.hover === day.dataset.date) return;
         datePopDrag.hover = day.dataset.date;
+        // 다음달(또는 이전달) 칸으로 드래그하면 해당 달로 뷰를 넘겨 연속 선택이 되게 한다
+        const hoverDate = parseDateStr(day.dataset.date);
+        if (
+          !Number.isNaN(hoverDate.getTime()) &&
+          (hoverDate.getFullYear() !== datePopYear || hoverDate.getMonth() !== datePopMonth)
+        ) {
+          datePopYear = hoverDate.getFullYear();
+          datePopMonth = hoverDate.getMonth();
+        }
         renderDatePop();
       });
     }
@@ -3631,24 +3651,27 @@
     const first = new Date(datePopYear, datePopMonth, 1);
     const leading = first.getDay();
     const daysInMonth = new Date(datePopYear, datePopMonth + 1, 0).getDate();
+    /** @type {{ date: Date, muted: boolean }[]} */
     const cells = [];
 
-    for (let i = 0; i < leading; i++) cells.push(null);
-    for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(datePopYear, datePopMonth, d));
-    while (cells.length % 7 !== 0) cells.push(null);
+    // 이전달 날짜를 채워 월말→월초 드래그가 끊기지 않게 한다
+    for (let i = 0; i < leading; i++) {
+      cells.push({ date: new Date(datePopYear, datePopMonth, -leading + i + 1), muted: true });
+    }
+    for (let d = 1; d <= daysInMonth; d++) {
+      cells.push({ date: new Date(datePopYear, datePopMonth, d), muted: false });
+    }
+    while (cells.length % 7 !== 0) {
+      const nextDay = cells.length - (leading + daysInMonth) + 1;
+      cells.push({ date: new Date(datePopYear, datePopMonth + 1, nextDay), muted: true });
+    }
 
     datePopGrid.innerHTML = "";
-    cells.forEach((date) => {
-      if (!date) {
-        const blank = document.createElement("span");
-        blank.className = "date-pop__day date-pop__day--blank";
-        datePopGrid.appendChild(blank);
-        return;
-      }
+    cells.forEach(({ date, muted }) => {
       const dateStr = toDateStrFromDate(date);
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className = "date-pop__day";
+      btn.className = "date-pop__day" + (muted ? " date-pop__day--muted" : "");
       btn.dataset.date = dateStr;
       btn.textContent = String(date.getDate());
       const dow = date.getDay();
