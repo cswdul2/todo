@@ -1382,9 +1382,34 @@
     return out;
   }
 
+  async function ensureFirebaseAnonymousAuth(app) {
+    if (!window.firebase || !window.firebase.auth) {
+      throw new Error("Firebase Auth SDK가 로드되지 않았습니다.");
+    }
+    const auth = window.firebase.auth(app);
+    if (auth.currentUser) return auth.currentUser;
+    const cred = await auth.signInAnonymously();
+    return cred.user;
+  }
+
   async function loadTasks() {
-    if (!window.firebase || !window.firebase.apps) return;
+    if (!window.firebase || !window.firebase.apps) {
+      console.error("Firebase SDK가 로드되지 않았습니다.");
+      return;
+    }
     const app = window.firebase.apps.length ? window.firebase.app() : window.firebase.initializeApp(FIREBASE_CONFIG);
+    try {
+      await ensureFirebaseAnonymousAuth(app);
+    } catch (err) {
+      console.error("Firebase anonymous auth failed:", err);
+      alert(
+        "Firebase 익명 로그인에 실패했습니다.\n" +
+          "Firebase Console → Authentication → Sign-in method 에서 Anonymous 를 활성화해 주세요.\n\n" +
+          (err && err.message ? err.message : String(err))
+      );
+      return;
+    }
+
     firebaseDb = window.firebase.database(app);
     firebaseTasksRef = firebaseDb.ref(FIREBASE_TASKS_PATH);
     const metaRef = firebaseDb.ref(FIREBASE_META_PATH);
@@ -1401,11 +1426,18 @@
       },
       (err) => {
         console.error("Firebase sync error:", err);
+        alert(
+          "Firebase 데이터 동기화에 실패했습니다.\n" +
+            "Realtime Database Rules 에서 auth != null 일 때 shared-calendar 읽기/쓰기를 허용해 주세요.\n\n" +
+            (err && err.message ? err.message : String(err))
+        );
       }
     );
 
     // 메타 경로가 없더라도 생성될 수 있도록 no-op write 보장
-    metaRef.update({ connectedAt: new Date().toISOString() }).catch(() => {});
+    metaRef.update({ connectedAt: new Date().toISOString() }).catch((err) => {
+      console.error("Firebase meta update failed:", err);
+    });
   }
 
   async function saveTasks() {
