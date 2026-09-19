@@ -1977,7 +1977,7 @@
         const dotsTop = dotsEl ? dotsEl.offsetTop : cell.offsetHeight;
         const bottomReserve = Math.max(0, cell.offsetHeight - dotsTop);
         const barBottomRel = barBottomAbs - cell.offsetTop;
-        const requiredHeight = barBottomRel + 3 + bottomReserve;
+        const requiredHeight = barBottomRel + 10 + bottomReserve;
         const overflow = Math.ceil(requiredHeight - cell.offsetHeight);
         if (overflow > 0) rowOverflowPx[row] = Math.max(rowOverflowPx[row] || 0, overflow);
       });
@@ -2014,7 +2014,7 @@
           if (relBottom > maxBottomInCell) maxBottomInCell = relBottom;
         });
         if (!Number.isFinite(maxBottomInCell)) return;
-        const overlap = Math.ceil(maxBottomInCell + 3 - dotsTop);
+        const overlap = Math.ceil(maxBottomInCell + 10 - dotsTop);
         if (overlap > 0) overlapByRow[row] = Math.max(overlapByRow[row] || 0, overlap);
       });
 
@@ -2027,7 +2027,7 @@
         for (let row = 0; row < rowCount; row++) {
           const base = currentRows[row] || 0;
           // 드래그 후 바가 몰린 케이스에서 재침범을 막기 위해 버퍼를 크게 준다.
-          nextRows.push(`${base + (overlapByRow[row] || 0) + 20}px`);
+          nextRows.push(`${base + (overlapByRow[row] || 0) + 28}px`);
         }
         calendarGrid.style.gridTemplateRows = nextRows.join(" ");
         barDotLayoutFixAttempts += 1;
@@ -2085,7 +2085,7 @@
         if (dotsHeight > maxDotsHeight) maxDotsHeight = dotsHeight;
         const headerGap = 7;
         // 날짜별 dot 개수(1줄/2줄/3줄)에 따라 실제 하단 보호 높이를 반영한다.
-        const dotSafe = Math.max(20, dotsHeight + 14);
+        const dotSafe = Math.max(24, dotsHeight + 18);
         const cellRequired = contentBottom + headerGap + laneStackHeight + dotSafe;
         if (cellRequired > rowRequiredHeight) rowRequiredHeight = cellRequired;
       });
@@ -2095,7 +2095,7 @@
       const dotsBlock = Math.max(20, maxDotsHeight);
       // 동그라미는 "마지막 수평바 하단 + 3px" 아래에서 시작해야 한다.
       // flex 레이아웃/패딩/브라우저 렌더 오차를 감안해 하단 여유를 넉넉히 확보한다.
-      const strictRowHeight = laneStackBottom + 3 + dotsBlock + 50;
+      const strictRowHeight = laneStackBottom + 10 + dotsBlock + 56;
       const taskExtra = Math.max(0, maxTasks - 4) * 6;
       const h = Math.max(108, 92 + taskExtra, strictRowHeight, rowRequiredHeight) + (rowOverflowPx[row] || 0);
       rows.push(`${h}px`);
@@ -2401,7 +2401,7 @@
         cell.dataset.holidayName = holidayName;
         cell.setAttribute("aria-label", `${cell.dataset.dateStr} ${holidayName}`);
       }
-      cell.innerHTML = `<span class="calendar-cell__ongoing-count" hidden></span><span class="calendar-cell__num">${d}</span><div class="calendar-cell__dots" aria-hidden="true"></div>`;
+      cell.innerHTML = calendarCellInnerHtml(String(d));
       if (holidayName) {
         const num = cell.querySelector(".calendar-cell__num");
         if (num) num.insertAdjacentHTML("beforeend", ` <span class="calendar-cell__holiday-name">${escapeHtml(holidayName)}</span>`);
@@ -2434,7 +2434,7 @@
       }
 
       cell.dataset.dateStr = ds;
-      cell.innerHTML = `<span class="calendar-cell__ongoing-count" hidden></span><span class="calendar-cell__num">${d}</span><div class="calendar-cell__dots" aria-hidden="true"></div>`;
+      cell.innerHTML = calendarCellInnerHtml(String(d));
       if (holidayName) {
         const num = cell.querySelector(".calendar-cell__num");
         if (num) num.insertAdjacentHTML("beforeend", ` <span class="calendar-cell__holiday-name">${escapeHtml(holidayName)}</span>`);
@@ -2456,7 +2456,7 @@
         cell.dataset.holidayName = holidayName;
         cell.setAttribute("aria-label", `${cell.dataset.dateStr} ${holidayName}`);
       }
-      cell.innerHTML = `<span class="calendar-cell__ongoing-count" hidden></span><span class="calendar-cell__num">${i}</span><div class="calendar-cell__dots" aria-hidden="true"></div>`;
+      cell.innerHTML = calendarCellInnerHtml(String(i));
       if (holidayName) {
         const num = cell.querySelector(".calendar-cell__num");
         if (num) num.insertAdjacentHTML("beforeend", ` <span class="calendar-cell__holiday-name">${escapeHtml(holidayName)}</span>`);
@@ -2483,6 +2483,18 @@
       else s += 2;
     });
     return s;
+  }
+
+
+  function calendarCellInnerHtml(dayLabel) {
+    return (
+      '<span class="calendar-cell__ongoing-count" hidden></span>' +
+      '<span class="calendar-cell__num">' +
+      dayLabel +
+      "</span>" +
+      '<span class="calendar-cell__range-spacer" aria-hidden="true"></span>' +
+      '<div class="calendar-cell__dots" aria-hidden="true"></div>'
+    );
   }
 
   function buildDailyMhBadgeTooltip(dayEffortRows, spentDailyMh, totalDailyMh) {

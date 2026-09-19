@@ -740,7 +740,7 @@ body.calendar-dragging {
 }
 
 .calendar-cell__dots {
-  margin-top: auto;
+  margin-top: 6px;
   position: relative;
   z-index: 40;
   display: flex;
@@ -748,9 +748,23 @@ body.calendar-dragging {
   align-items: center;
   gap: 3px;
   max-width: 100%;
-  padding-top: 3px;
+  padding-top: 2px;
   background: inherit;
   overflow: visible;
+  flex: 0 0 auto;
+}
+
+/* Reserve vertical room for range stack bars so dots do not overlap */
+.calendar-cell__range-spacer {
+  display: block;
+  flex: 0 0 auto;
+  align-self: stretch;
+  width: 100%;
+  /* BAR_HEIGHT 8 + BAR_GAP 4 = LINE_STEP 12 */
+  height: calc(var(--range-lanes, 0) * 12px);
+  min-height: 0;
+  margin-top: 6px;
+  pointer-events: none;
 }
 
 
@@ -3364,7 +3378,7 @@ body.calendar-dragging {
 
   .calendar-cell {
     min-height: 58px;
-    overflow: hidden;
+    overflow: visible;
   }
 
   .calendar-cell__ongoing-count {
