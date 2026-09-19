@@ -2,8 +2,17 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>일정 관리 — 월 달력</title>
+  <meta name="description" content="월 달력으로 할일을 관리하고 사진에서 일정을 인식해 등록하는 앱" />
+  <meta name="theme-color" content="#4a7fd4" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="app-icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="app-icon.svg" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="일정 관리" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -18,8 +27,8 @@
           <option value="done">done</option>
         </select>
       </div>
-      <button type="button" class="btn-ocr" id="btnExport" title="일정 백업(JSON 내보내기)">💾 내보내기</button>
-      <button type="button" class="btn-ocr" id="btnImport" title="일정 복원(JSON 가져오기)">📂 가져오기</button>
+      <button type="button" class="btn-ocr" id="btnExport" title="일정 백업(JSON 내보내기)">💾 일정백업</button>
+      <button type="button" class="btn-ocr" id="btnImport" title="일정 복원(JSON 가져오기)">📂 일정복원</button>
       <input type="file" id="importFileInput" accept="application/json,.json" hidden />
       <button type="button" class="btn-ocr" id="btnOpenOcr" title="손글씨·사진 할일 목록 인식 (Gemini)">📷 사진 가져오기</button>
       <button type="button" class="btn-ocr" id="btnOpenCamera" title="카메라로 촬영 후 할일 인식">🎥 바로 촬영</button>

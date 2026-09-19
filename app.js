@@ -3494,12 +3494,12 @@
         const parsed = JSON.parse(txt);
         const incoming = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.tasks) ? parsed.tasks : null;
         if (!incoming) {
-          alert("가져오기 파일 형식이 올바르지 않습니다. (tasks 배열 필요)");
+          alert("일정복원 파일 형식이 올바르지 않습니다. (tasks 배열 필요)");
           return;
         }
-        const ok = await openConfirmDialog("현재 일정을 가져온 파일로 덮어쓸까요?", {
-          title: "가져오기 확인",
-          okLabel: "가져오기",
+        const ok = await openConfirmDialog("현재 일정을 백업 파일 내용으로 덮어쓸까요?", {
+          title: "일정복원 확인",
+          okLabel: "일정복원",
           cancelLabel: "취소",
           showCancel: true,
         });
@@ -3508,9 +3508,9 @@
         await saveTasks();
         renderCalendar();
         updateSearchResults();
-        alert(`가져오기 완료: ${tasks.length}건`);
+        alert(`일정복원 완료: ${tasks.length}건`);
       } catch (e) {
-        alert("가져오기 실패: JSON 파일을 확인해 주세요.");
+        alert("일정복원 실패: JSON 파일을 확인해 주세요.");
       }
     });
   }
@@ -3726,7 +3726,19 @@
     }, 60 * 1000);
   }
 
+  /** PWA: 서비스 워커 등록 (file:// 로 열었을 때는 건너뜀) */
+  function registerServiceWorker() {
+    if (!("serviceWorker" in navigator)) return;
+    if (location.protocol !== "http:" && location.protocol !== "https:") return;
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js").catch((err) => {
+        console.error("Service worker registration failed:", err);
+      });
+    });
+  }
+
   (async () => {
+    registerServiceWorker();
     await loadGeminiKey();
     await loadTasks();
     updateTopbarDatePill();

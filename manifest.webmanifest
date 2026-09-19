@@ -1,0 +1,27 @@
+{
+  "name": "일정 관리 — 월 달력",
+  "short_name": "일정 관리",
+  "description": "월 달력으로 할일을 관리하고 사진에서 일정을 인식해 등록하는 앱",
+  "lang": "ko",
+  "dir": "ltr",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#eef1f5",
+  "theme_color": "#4a7fd4",
+  "icons": [
+    {
+      "src": "app-icon.svg",
+      "sizes": "192x192 512x512 any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "app-icon.svg",
+      "sizes": "512x512 any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
