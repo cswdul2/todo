@@ -638,15 +638,12 @@ body.calendar-dragging {
   opacity: 0.45;
 }
 
-/* 오늘(연체 아님): 셀 위치는 고정하고 가장자리 입체 효과만 강조 */
+/* 오늘(연체 아님): 은은한 강조 — 두꺼운 사각 링은 쓰지 않음 */
 .calendar-cell--today:not(.calendar-cell--overdue) {
-  border-color: #4f84dc;
+  border-color: #5b8fd9;
   box-shadow:
-    0 0 0 2px rgba(74, 127, 212, 0.52),
-    0 14px 28px rgba(15, 23, 42, 0.34),
-    0 3px 0 rgba(255, 255, 255, 0.9) inset,
-    0 -2px 0 rgba(90, 127, 180, 0.32) inset,
-    0 0 22px rgba(96, 165, 250, 0.2);
+    0 6px 16px rgba(59, 130, 246, 0.18),
+    0 2px 0 rgba(255, 255, 255, 0.85) inset;
 }
 
 .calendar-cell--today .calendar-cell__num,
@@ -713,21 +710,15 @@ body.calendar-dragging {
 .calendar-cell--today.calendar-cell--heat-high:not(.calendar-cell--overdue),
 .calendar-cell--today.calendar-cell--heat-critical:not(.calendar-cell--overdue) {
   box-shadow:
-    0 0 0 2px rgba(74, 127, 212, 0.52),
-    0 14px 28px rgba(15, 23, 42, 0.34),
-    0 3px 0 rgba(255, 255, 255, 0.9) inset,
-    0 -2px 0 rgba(90, 127, 180, 0.32) inset,
-    0 0 22px rgba(96, 165, 250, 0.2);
+    0 6px 16px rgba(59, 130, 246, 0.16),
+    0 2px 0 rgba(255, 255, 255, 0.85) inset;
 }
 
-/* 오늘이면서 연체: 파란 링 + 적색 점선 */
+/* 오늘이면서 연체: 은은한 파란 그림자 + 적색 점선은 overdue 규칙 유지 */
 .calendar-cell--today.calendar-cell--overdue {
   box-shadow:
-    0 0 0 2px rgba(74, 127, 212, 0.52),
-    0 14px 28px rgba(15, 23, 42, 0.34),
-    0 3px 0 rgba(255, 255, 255, 0.9) inset,
-    0 -2px 0 rgba(90, 127, 180, 0.32) inset,
-    0 0 22px rgba(96, 165, 250, 0.2);
+    0 6px 16px rgba(59, 130, 246, 0.14),
+    0 2px 0 rgba(255, 255, 255, 0.85) inset;
 }
 
 .calendar-cell--overdue.calendar-cell--heat-low:hover:not(:disabled) {
