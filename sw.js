@@ -1,4 +1,4 @@
-/* ?�정 관�????�비???�커: ????캐시 + ?�프?�인 ?�??*/
+/* 일정 관리 앱 서비스 워커: 앱 셸 캐시 + 오프라인 대응 */
 "use strict";
 
 const CACHE_VERSION = "v12";
@@ -40,7 +40,7 @@ self.addEventListener("message", (event) => {
   if (event.data && event.data.type === "SKIP_WAITING") self.skipWaiting();
 });
 
-/** Firebase·Gemini ???��? ?�청�?�?GET ?�청?� 가로채지 ?�는?? */
+/** Firebase·Gemini 등 외부 요청과 비 GET 요청은 가로채지 않는다. */
 function shouldHandle(request) {
   if (request.method !== "GET") return false;
   const url = new URL(request.url);
@@ -49,8 +49,8 @@ function shouldHandle(request) {
 }
 
 /**
- * ?�트?�크 ?�선 + 캐시 ?�백.
- * 배포 직후?�도 ??�� 최신 코드�?받고, ?�프?�인???�만 캐시�??�다.
+ * 네트워크 우선 + 캐시 폴백.
+ * 배포 직후에도 항상 최신 코드를 받고, 오프라인일 때만 캐시를 쓴다.
  */
 self.addEventListener("fetch", (event) => {
   const { request } = event;

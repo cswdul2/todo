@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>?�정 관�??????�력</title>
-  <meta name="description" content="???�력?�로 ?�일??관리하�??�진?�서 ?�정???�식???�록?�는 ?? />
+  <title>일정 관리 — 월 달력</title>
+  <meta name="description" content="월 달력으로 할일을 관리하고 사진에서 일정을 인식해 등록하는 앱" />
   <meta name="theme-color" content="#4a7fd4" />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" href="app-icon.svg" type="image/svg+xml" />
@@ -13,34 +13,34 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-  <meta name="apple-mobile-web-app-title" content="?�정 관�? />
+  <meta name="apple-mobile-web-app-title" content="일정 관리" />
   <link rel="stylesheet" href="styles.css?v=12" />
 </head>
 <body>
   <div class="app">
     <div class="toolbar">
       <div class="toolbar__search">
-        <input type="search" id="searchInput" class="toolbar__input" placeholder="?�목·?�명 검?? autocomplete="off" />
-        <select id="searchStatus" class="toolbar__select" aria-label="?�태�??�터">
-          <option value="all">?�태 ?�체</option>
+        <input type="search" id="searchInput" class="toolbar__input" placeholder="제목·설명 검색" autocomplete="off" />
+        <select id="searchStatus" class="toolbar__select" aria-label="상태로 필터">
+          <option value="all">상태 전체</option>
           <option value="ready">ready</option>
           <option value="on-going">on-going</option>
           <option value="done">done</option>
         </select>
       </div>
-      <div class="toolbar__actions" role="toolbar" aria-label="?�정 ?�구">
-        <button type="button" class="btn-ocr btn-ocr--icon" id="btnExport" title="?�정 백업" aria-label="?�정 백업">
+      <div class="toolbar__actions" role="toolbar" aria-label="일정 도구">
+        <button type="button" class="btn-ocr btn-ocr--icon" id="btnExport" title="일정 백업" aria-label="일정 백업">
           <svg class="btn-ocr__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <path fill="currentColor" d="M12 3a1 1 0 0 1 1 1v8.59l2.3-2.3a1 1 0 1 1 1.4 1.42l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.42L11 12.59V4a1 1 0 0 1 1-1Zm-7 14a1 1 0 0 1 1 1v1h12v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z"/>
           </svg>
         </button>
-        <button type="button" class="btn-ocr btn-ocr--icon" id="btnImport" title="?�정 복원" aria-label="?�정 복원">
+        <button type="button" class="btn-ocr btn-ocr--icon" id="btnImport" title="일정 복원" aria-label="일정 복원">
           <svg class="btn-ocr__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <path fill="currentColor" d="M12 15a1 1 0 0 1-1-1V5.41L8.7 7.7a1 1 0 1 1-1.4-1.42l4-4a1 1 0 0 1 1.4 0l4 4a1 1 0 1 1-1.4 1.42L13 5.41V14a1 1 0 0 1-1 1Zm-7 2a1 1 0 0 1 1 1v1h12v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z"/>
           </svg>
         </button>
         <input type="file" id="importFileInput" accept="application/json,.json" hidden />
-        <button type="button" class="btn-ocr btn-ocr--icon" id="btnOpenOcr" title="?�진?�서 ?�일 가?�오�? aria-label="?�진?�서 ?�일 가?�오�?>
+        <button type="button" class="btn-ocr btn-ocr--icon" id="btnOpenOcr" title="사진에서 할일 가져오기" aria-label="사진에서 할일 가져오기">
           <svg class="btn-ocr__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <path fill="currentColor" d="M4 5a2 2 0 0 1 2-2h3.2l.9 1.35A1 1 0 0 0 10.95 5H18a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5Zm8 3.5A4.5 4.5 0 1 0 16.5 13 4.5 4.5 0 0 0 12 8.5Zm0 2a2.5 2.5 0 1 1-2.5 2.5A2.5 2.5 0 0 1 12 10.5Z"/>
           </svg>
@@ -55,70 +55,70 @@
     </div>
 
     <header class="calendar-header">
-      <button type="button" class="nav-btn" id="prevMonth" aria-label="?�전 ??>??/button>
+      <button type="button" class="nav-btn" id="prevMonth" aria-label="이전 달">‹</button>
       <h1 class="month-title" id="monthTitle"></h1>
-      <button type="button" class="nav-btn" id="nextMonth" aria-label="?�음 ??>??/button>
+      <button type="button" class="nav-btn" id="nextMonth" aria-label="다음 달">›</button>
     </header>
 
     <div class="search-results" id="searchResults" hidden>
-      <p class="search-results__title">검??결과 <span id="searchCount"></span></p>
+      <p class="search-results__title">검색 결과 <span id="searchCount"></span></p>
       <ul class="search-results__list" id="searchResultsList"></ul>
     </div>
 
-    <div class="dot-legend" aria-label="?�력 ???�·중?�도 ?�명">
+    <div class="dot-legend" aria-label="달력 점 색·중요도 설명">
       <div class="dot-legend__panel">
         <div class="dot-legend__title-row">
-          <span class="dot-legend__title">범�?</span>
+          <span class="dot-legend__title">범례</span>
         </div>
-        <p class="dot-legend__heading">진행 ?�태</p>
+        <p class="dot-legend__heading">진행 상태</p>
         <div class="dot-legend__row">
           <span class="dot-legend__item"><span class="calendar-cell__dot calendar-cell__dot--ready"></span> ready</span>
           <span class="dot-legend__item"><span class="calendar-cell__dot calendar-cell__dot--ongoing"></span> on-going</span>
           <span class="dot-legend__item"><span class="calendar-cell__dot calendar-cell__dot--done"></span> done</span>
-          <span class="dot-legend__item"><span class="calendar-cell__dot calendar-cell__dot--overdue-legend"></span> 기한 초과(미완�?</span>
+          <span class="dot-legend__item"><span class="calendar-cell__dot calendar-cell__dot--overdue-legend"></span> 기한 초과(미완료)</span>
         </div>
-        <p class="dot-legend__heading">중요??(?�기�??�름 · 채�? ?�음)</p>
+        <p class="dot-legend__heading">중요도 (크기만 다름 · 채움 없음)</p>
         <div class="dot-legend__row">
-          <span class="dot-legend__item"><span class="imp-ring imp-ring--high" aria-hidden="true"></span> ??/span>
-          <span class="dot-legend__item"><span class="imp-ring imp-ring--medium" aria-hidden="true"></span> �?/span>
-          <span class="dot-legend__item"><span class="imp-ring imp-ring--low" aria-hidden="true"></span> ??/span>
+          <span class="dot-legend__item"><span class="imp-ring imp-ring--high" aria-hidden="true"></span> 상</span>
+          <span class="dot-legend__item"><span class="imp-ring imp-ring--medium" aria-hidden="true"></span> 중</span>
+          <span class="dot-legend__item"><span class="imp-ring imp-ring--low" aria-hidden="true"></span> 하</span>
         </div>
         <p class="dot-legend__heading dot-legend__heading--tip" tabindex="0">
-          ?�일 ?�무강도
-          <span class="dot-legend__tip" role="tooltip">(?�일 걸쳐?�는 Task 중요???�산 기�?)</span>
+          당일 업무강도
+          <span class="dot-legend__tip" role="tooltip">(당일 걸쳐있는 Task 중요도 합산 기준)</span>
         </p>
         <div class="dot-legend__row">
-          <span class="dot-legend__item"><span class="heat-swatch heat-swatch--low" aria-hidden="true"></span> 3???�하 ?�하??/span>
-          <span class="dot-legend__item"><span class="heat-swatch heat-swatch--mid" aria-hidden="true"></span> 4~7???�노??/span>
-          <span class="dot-legend__item"><span class="heat-swatch heat-swatch--high" aria-hidden="true"></span> 8~9??주황</span>
-          <span class="dot-legend__item"><span class="heat-swatch heat-swatch--critical" aria-hidden="true"></span> 10???�상 빨강</span>
+          <span class="dot-legend__item"><span class="heat-swatch heat-swatch--low" aria-hidden="true"></span> 3점 이하 연하늘</span>
+          <span class="dot-legend__item"><span class="heat-swatch heat-swatch--mid" aria-hidden="true"></span> 4~7점 연노랑</span>
+          <span class="dot-legend__item"><span class="heat-swatch heat-swatch--high" aria-hidden="true"></span> 8~9점 주황</span>
+          <span class="dot-legend__item"><span class="heat-swatch heat-swatch--critical" aria-hidden="true"></span> 10점 이상 빨강</span>
         </div>
       </div>
     </div>
 
     <div class="weekdays" role="row">
-      <span>??/span><span>??/span><span>??/span><span>??/span><span>�?/span><span>�?/span><span>??/span>
+      <span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span>
     </div>
 
     <div class="calendar-shell" id="calendarShell">
-      <div class="calendar-grid" id="calendarGrid" role="grid" aria-label="???�력"></div>
+      <div class="calendar-grid" id="calendarGrid" role="grid" aria-label="월 달력"></div>
       <div class="calendar-range-layer" id="calendarRangeLayer" aria-hidden="true"></div>
     </div>
   </div>
 
-  <!-- ?�일 모달 -->
+  <!-- 할일 모달 -->
   <div class="modal-backdrop" id="modalBackdrop" hidden></div>
   <div class="modal" id="taskModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden>
     <div class="modal__inner" id="modalInner">
       <div class="modal__topbar">
         <div class="modal__topbar-text">
-          <h2 class="modal__title" id="modalTitle">?�일 목록</h2>
+          <h2 class="modal__title" id="modalTitle">할일 목록</h2>
           <p class="modal__hint" id="modalDateHint"></p>
         </div>
         <div class="modal__topbar-actions">
           <div class="modal__topbar-recurrence">
-            <select id="taskRecurrence" name="recurrence" class="modal__quick-input modal__quick-recurrence" aria-label="반복 ?�정">
-              <option value="none">반복 ?�음</option>
+            <select id="taskRecurrence" name="recurrence" class="modal__quick-input modal__quick-recurrence" aria-label="반복 설정">
+              <option value="none">반복 없음</option>
               <option value="daily">매일</option>
               <option value="weekly">매주</option>
               <option value="monthly">매월</option>
@@ -127,28 +127,28 @@
               <span class="modal__today-pill" id="modalTodayDisplay" aria-live="polite"></span>
             </div>
           </div>
-          <button type="button" class="btn btn--primary modal__btn-new-top" id="btnNewTask">+ ???�일 추�?</button>
+          <button type="button" class="btn btn--primary modal__btn-new-top" id="btnNewTask">+ 새 할일 추가</button>
         </div>
       </div>
 
       <div class="modal__field modal__field--inline">
-        <label for="taskTitle">?�목</label>
-        <input type="text" id="taskTitle" name="title" placeholder="?�정 ?�목" />
+        <label for="taskTitle">제목</label>
+        <input type="text" id="taskTitle" name="title" placeholder="일정 제목" />
       </div>
       <div class="modal__field modal__quick-meta" id="modalQuickMeta">
         <div class="modal__quick-layout">
           <div class="modal__quick-line modal__quick-line--imp">
-            <span class="modal__quick-meta-label">중요??/span>
-            <div class="modal__quick-meta-group" id="quickImportanceGroup" role="radiogroup" aria-label="중요??>
-              <button type="button" class="modal__quick-btn" data-importance="high">??/button>
-              <button type="button" class="modal__quick-btn" data-importance="medium">�?/button>
-              <button type="button" class="modal__quick-btn" data-importance="low">??/button>
+            <span class="modal__quick-meta-label">중요도</span>
+            <div class="modal__quick-meta-group" id="quickImportanceGroup" role="radiogroup" aria-label="중요도">
+              <button type="button" class="modal__quick-btn" data-importance="high">상</button>
+              <button type="button" class="modal__quick-btn" data-importance="medium">중</button>
+              <button type="button" class="modal__quick-btn" data-importance="low">하</button>
             </div>
           </div>
           <div class="modal__quick-line modal__quick-line--effort">
-            <label class="modal__quick-meta-label" for="taskEffortValue">?�입?�상공수</label>
+            <label class="modal__quick-meta-label" for="taskEffortValue">투입예상공수</label>
             <div class="modal__quick-effort">
-              <input type="number" id="taskEffortValue" name="effortValue" min="0" step="1" placeholder="?? 24" class="modal__quick-input" />
+              <input type="number" id="taskEffortValue" name="effortValue" min="0" step="1" placeholder="예: 24" class="modal__quick-input" />
               <select id="taskEffortUnit" name="effortUnit" class="modal__quick-input modal__quick-unit">
                 <option value="MH">MH</option>
                 <option value="MD">MD</option>
@@ -156,21 +156,21 @@
             </div>
           </div>
           <div class="modal__quick-line modal__quick-line--actual">
-            <label class="modal__quick-meta-label" for="taskActualEffortValue">?�입?�적공수</label>
+            <label class="modal__quick-meta-label" for="taskActualEffortValue">투입실적공수</label>
             <input type="text" id="taskActualEffortValue" class="modal__quick-input" readonly value="0MH" />
           </div>
           <div class="modal__quick-line modal__quick-line--start">
-            <label class="modal__quick-meta-label" for="taskStart">?�작??/label>
+            <label class="modal__quick-meta-label" for="taskStart">시작일</label>
             <input type="date" id="taskStart" name="start" class="modal__quick-input" />
           </div>
           <div class="modal__quick-line modal__quick-line--end">
-            <label class="modal__quick-meta-label" for="taskEnd">종료??/label>
+            <label class="modal__quick-meta-label" for="taskEnd">종료일</label>
             <input type="date" id="taskEnd" name="end" class="modal__quick-input" />
           </div>
           <div class="modal__quick-line modal__quick-line--status">
-            <span class="modal__quick-meta-label">진행?�태</span>
+            <span class="modal__quick-meta-label">진행상태</span>
             <div class="modal__quick-status-row">
-              <div class="modal__quick-meta-group" id="quickStatusGroup" role="radiogroup" aria-label="진행 ?�태">
+              <div class="modal__quick-meta-group" id="quickStatusGroup" role="radiogroup" aria-label="진행 상태">
                 <button type="button" class="modal__quick-btn" data-status="ready">ready</button>
                 <button type="button" class="modal__quick-btn" data-status="on-going">on-going</button>
                 <button type="button" class="modal__quick-btn" data-status="done">done</button>
@@ -181,35 +181,35 @@
       </div>
 
       <p class="modal__field-hint modal__field-hint--accent">
-        진행?�태·중요?�는 ?�래 ?�일목록 ??��??마우?��? ?�린 ???�팁?�서 변경할 ???�습?�다.
+        진행상태·중요도는 아래 할일목록 항목에 마우스를 올린 뒤 툴팁에서 변경할 수 있습니다.
       </p>
 
       <div class="modal__field">
-        <label for="taskDescription">?�명 (description)</label>
-        <textarea id="taskDescription" name="description" rows="2" placeholder="?�세???�용???�어주세??"></textarea>
+        <label for="taskDescription">설명 (description)</label>
+        <textarea id="taskDescription" name="description" rows="2" placeholder="자세한 내용을 적어주세요."></textarea>
       </div>
 
       <div class="modal__section">
         <div class="modal__section-head">
-          <h3 class="modal__section-title">?�상?�출�?/h3>
+          <h3 class="modal__section-title">예상산출물</h3>
           <button
             type="button"
             class="btn btn--ghost modal__section-add"
             id="btnDeliverableAddToggle"
             aria-controls="deliverableEditorHead"
             aria-expanded="false"
-            aria-label="?�출�??�력�??�기"
-            title="?�출�??�력�??�기"
-          >??/button>
+            aria-label="산출물 입력칸 열기"
+            title="산출물 입력칸 열기"
+          >➕</button>
         </div>
         <div class="deliverable-editor" id="deliverableEditor">
           <div class="deliverable-editor__head" id="deliverableEditorHead" hidden>
             <span class="deliverable-editor__spacer" aria-hidden="true"></span>
-            <textarea id="deliverableNameInput" class="deliverable-editor__name" rows="1" placeholder="?�출물명 ?�력" spellcheck="false"></textarea>
-            <select id="deliverableImportanceInput" class="deliverable-editor__importance" aria-label="?�출�?중요??>
-              <option value="high">??/option>
-              <option value="medium">�?/option>
-              <option value="low">??/option>
+            <textarea id="deliverableNameInput" class="deliverable-editor__name" rows="1" placeholder="산출물명 입력" spellcheck="false"></textarea>
+            <select id="deliverableImportanceInput" class="deliverable-editor__importance" aria-label="산출물 중요도">
+              <option value="high">상</option>
+              <option value="medium">중</option>
+              <option value="low">하</option>
             </select>
             <span class="deliverable-editor__action-spacer" aria-hidden="true"></span>
           </div>
@@ -219,58 +219,58 @@
 
       <div class="modal__tasks" id="existingTasksWrap" hidden>
         <div class="modal__tasks-head">
-          <h3 class="modal__subheading">???�짜???�당?�는 ?�일</h3>
+          <h3 class="modal__subheading">이 날짜에 해당하는 할일</h3>
         </div>
         <ul class="task-chip-list" id="existingTasksList"></ul>
       </div>
 
       <div class="modal__actions">
-        <button type="button" class="btn btn--danger" id="btnDelete" hidden>??��</button>
+        <button type="button" class="btn btn--danger" id="btnDelete" hidden>삭제</button>
         <div class="modal__actions-right">
-          <span class="modal__actions-hint">모달 바깥???�릭?�면 ?�?�됩?�다 · ?�돌리기 Ctrl+Z</span>
+          <span class="modal__actions-hint">모달 바깥을 클릭하면 저장됩니다 · 되돌리기 Ctrl+Z</span>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Gemini OCR: ?��?지 ???�일 목록 (API ?�는 브라?��??�만 ?�?? -->
+  <!-- Gemini OCR: 이미지 → 할일 목록 (API 키는 브라우저에만 저장) -->
   <div class="modal-backdrop" id="ocrBackdrop" hidden></div>
   <div class="modal modal--ocr" id="ocrModal" role="dialog" aria-modal="true" aria-labelledby="ocrModalTitle" hidden>
     <div class="modal__inner modal__inner--default modal__inner--ocr">
-      <h2 class="modal__title" id="ocrModalTitle">?�진?�서 ?�일 가?�오�?/h2>
+      <h2 class="modal__title" id="ocrModalTitle">사진에서 할일 가져오기</h2>
       <p class="modal__hint">
-        Google AI Studio?�서 발급??Gemini API ?��? ?�용?�니?? ?��? ?��?지????PC 브라?��? 밖으�??�?�되지 ?�으�? ?�식 ?�청�?Google ?�버�??�송?�니??
+        Google AI Studio에서 발급한 Gemini API 키를 사용합니다. 키와 이미지는 이 PC 브라우저 밖으로 저장되지 않으며, 인식 요청만 Google 서버로 전송됩니다.
       </p>
       <div class="modal__field ocr-key-field">
-        <label for="geminiApiKey">Gemini API ??/label>
+        <label for="geminiApiKey">Gemini API 키</label>
         <div class="ocr-key-row">
-          <input type="password" id="geminiApiKey" class="toolbar__input" autocomplete="off" placeholder="API ?��? 붙여 ?�기" />
-          <button type="button" class="btn btn--ghost btn--sm" id="btnSaveGeminiKey">???�??/button>
+          <input type="password" id="geminiApiKey" class="toolbar__input" autocomplete="off" placeholder="API 키를 붙여 넣기" />
+          <button type="button" class="btn btn--ghost btn--sm" id="btnSaveGeminiKey">키 저장</button>
         </div>
       </div>
       <div class="modal__field">
-        <label for="ocrFileInput">?�일 목록 ?��?지</label>
-        <div class="ocr-drop-zone" id="ocrDropZone" role="button" tabindex="0" aria-label="?��?지 ?�일???�기???�어???�거???�릭?�서 ?�택">
-          ?�기�??��?지 ?�일???�어???�으?�요 (?�는 ?�릭?�서 ?�택)
+        <label for="ocrFileInput">할일 목록 이미지</label>
+        <div class="ocr-drop-zone" id="ocrDropZone" role="button" tabindex="0" aria-label="이미지 파일을 여기에 끌어다 놓거나 클릭해서 선택">
+          여기로 이미지 파일을 끌어다 놓으세요 (또는 클릭해서 선택)
         </div>
         <input type="file" id="ocrFileInput" accept="image/*" />
       </div>
       <div class="ocr-preview-wrap" id="ocrPreviewWrap" hidden>
-        <img class="ocr-preview-img" id="ocrPreviewImg" alt="?�택???��?지 미리보기" />
+        <img class="ocr-preview-img" id="ocrPreviewImg" alt="선택한 이미지 미리보기" />
       </div>
       <p class="ocr-status" id="ocrStatus" role="status"></p>
       <div class="ocr-actions-top">
-        <button type="button" class="btn btn--primary" id="btnOcrRun" disabled>?��?지 ?�식 (Gemini)</button>
+        <button type="button" class="btn btn--primary" id="btnOcrRun" disabled>이미지 인식 (Gemini)</button>
       </div>
       <div class="ocr-results" id="ocrResults" hidden>
-        <h3 class="modal__subheading">?�식 결과 (?�정 ???�력??추�?)</h3>
+        <h3 class="modal__subheading">인식 결과 (수정 후 달력에 추가)</h3>
         <ul class="ocr-draft-list" id="ocrDraftList"></ul>
         <div class="modal__actions ocr-results-actions">
-          <button type="button" class="btn btn--primary" id="btnOcrApply">?�택 ??�� ?�력??추�?</button>
+          <button type="button" class="btn btn--primary" id="btnOcrApply">선택 항목 달력에 추가</button>
         </div>
       </div>
       <div class="modal__actions ocr-footer-actions">
-        <button type="button" class="btn btn--ghost" id="btnOcrClose">?�기</button>
+        <button type="button" class="btn btn--ghost" id="btnOcrClose">닫기</button>
       </div>
     </div>
   </div>
@@ -278,11 +278,11 @@
   <div class="confirm-backdrop" id="confirmBackdrop" hidden></div>
   <div class="confirm-pop" id="confirmPop" role="dialog" aria-modal="true" aria-labelledby="confirmTitle" hidden>
     <div class="confirm-pop__inner">
-      <h3 class="confirm-pop__title" id="confirmTitle">??�� ?�인</h3>
+      <h3 class="confirm-pop__title" id="confirmTitle">삭제 확인</h3>
       <p class="confirm-pop__msg" id="confirmMessage"></p>
       <div class="confirm-pop__actions">
         <button type="button" class="btn btn--ghost" id="confirmCancel">취소</button>
-        <button type="button" class="btn btn--danger" id="confirmOk">??��</button>
+        <button type="button" class="btn btn--danger" id="confirmOk">삭제</button>
       </div>
     </div>
   </div>

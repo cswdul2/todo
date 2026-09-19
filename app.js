@@ -36,7 +36,7 @@
   /** @type {string | null} */
   let editingId = null;
 
-  /** ???�정(?�짜�???경우)?� ?�색 ?�마 ?��?, ??�� ?�택·?�태 변�??�에???�태??*/
+  /** 새 일정(날짜만 연 경우)은 흰색 테마 유지, 항목 선택·상태 변경 시에는 상태색 */
   let modalDefaultWhite = true;
 
   const monthTitle = document.getElementById("monthTitle");
@@ -117,7 +117,7 @@
   };
   const FIREBASE_TASKS_PATH = "shared-calendar/tasks";
   const FIREBASE_META_PATH = "shared-calendar/meta";
-  /** ?�호 모델 ?�서 (?�제 가??모델�?교집?�으�??�택) */
+  /** 선호 모델 순서 (실제 가용 모델과 교집합으로 선택) */
   const GEMINI_MODEL_PREFER = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
 
   /** @type {Array<{ title: string, description: string, status: string, importance: string, startDate: string, endDate: string, effortValue: number | null, effortUnit: 'MH'|'MD', recurrence: 'none', recurrenceUntil: null, confidence?: number }>} */
@@ -129,12 +129,12 @@
     effortUnit: "MH",
     recurrence: "none",
   };
-  /** ???�정 ?�성???�시 ?�태/중요??*/
+  /** 새 일정 작성용 임시 상태/중요도 */
   let draftStatus = "ready";
   let draftImportance = "medium";
-  /** ?�출�??�력?�에???�급??직접 고른 ?�이 ?�는지 (고르�??�에???�색 박스) */
+  /** 산출물 입력행에서 등급을 직접 고른 적이 있는지 (고르기 전에는 회색 박스) */
   let deliverableHeadImpPicked = false;
-  /** ?�출�??�록 ?�니메이??진행 중이�?중복 ?�록??막는??*/
+  /** 산출물 등록 애니메이션 진행 중이면 중복 등록을 막는다 */
   let deliverableCommitBusy = false;
   /** @type {string | null} */
   let ocrPendingBase64 = null;
@@ -161,7 +161,7 @@
   let modalSessionSnapshot = null;
   const RECURRENCE_ALERT_STATE_KEY = "calendar-app-recurrence-alert-state-v1";
   let recurrenceWatchTimer = null;
-  // ?�전 ?�행?�서 ?�아?�을 ???�는 커스?� ?�팁 ?�드 ?�리
+  // 이전 실행에서 남아있을 수 있는 커스텀 툴팁 노드 정리
   document.querySelectorAll(".range-line-tooltip").forEach((el) => el.remove());
 
   function pad2(n) {
@@ -191,7 +191,7 @@
   }
 
   function ensureRangeTooltip() {
-    // ?�리로드/?�크립트 ?�실???�으�??��? ?�래???�팁 ?�드�??�리
+    // 핫리로드/스크립트 재실행 등으로 남은 오래된 툴팁 노드를 정리
     const stale = document.querySelectorAll(".range-line-tooltip");
     if (stale.length > 1) {
       stale.forEach((el, idx) => {
@@ -247,7 +247,7 @@
           lastPointerClientY = e.clientY;
           const target = /** @type {Element | null} */ (e.target instanceof Element ? e.target : null);
           const hoveredLine = target ? target.closest(".calendar-range-line") : null;
-          // ?�구?�항: ?�평�??�역 밖이�?마�?�??�팁 ?�함 ?��? 즉시 ?�거
+          // 요구사항: 수평바 영역 밖이면 마지막 툴팁 포함 전부 즉시 제거
           if (!hoveredLine) {
             hideRangeTooltipNow();
             return;
@@ -343,7 +343,7 @@
       clearInterval(rangeTooltipWatchTimer);
       rangeTooltipWatchTimer = null;
     }
-    // ?�벤???�락�?무�??�게 "?�평바�? 벗어?�면 즉시 ?��?"??강제?�다.
+    // 이벤트 누락과 무관하게 "수평바를 벗어나면 즉시 숨김"을 강제한다.
     rangeTooltipWatchTimer = setInterval(() => {
       if (!rangeTooltipEl || rangeTooltipEl.hidden || !rangeTooltipAnchorEl) return;
       if (!rangeTooltipAnchorEl.matches(":hover")) {
@@ -406,7 +406,7 @@
         clearTimeout(showTimer);
         showTimer = null;
       }
-      // ?�구?�항: ?�평�??�역??벗어?�면 즉시 ?��?
+      // 요구사항: 수평바 영역을 벗어나면 즉시 숨김
       hideRangeTooltipNow();
     });
     lineEl.addEventListener("focus", () => {
@@ -438,7 +438,7 @@
       const inside = clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom;
       if (inside) return cell.dataset.dateStr || null;
     }
-    // fallback: 좌표가 ?� 경계???�에 걸친 경우 보조 ?�정
+    // fallback: 좌표가 셀 경계선 위에 걸친 경우 보조 판정
     const el = document.elementFromPoint(clientX, clientY);
     if (!(el instanceof Element)) return null;
     const cell = el.closest(".calendar-cell[data-date-str]");
@@ -514,7 +514,7 @@
         if (!Number.isFinite(delta) || delta === 0) return;
         pushUndoSnapshot();
 
-        // ?�래�??�롭 직후 발생?�는 click ?�벤?��? 먼�? ?�제?�다.
+        // 드래그 드롭 직후 발생하는 click 이벤트를 먼저 억제한다.
         suppressRangeClickTaskId = task.id;
         suppressRangeClickUntil = Date.now() + 450;
 
@@ -747,7 +747,7 @@
     return s;
   }
 
-  /** ?�료?�짜가 ?�으�?�??�짜 기�??�로 ?�료. 구버??done�??�으�???기간 ?�료�?본다. */
+  /** 완료날짜가 있으면 그 날짜 기준으로 완료. 구버전 done만 있으면 전 기간 완료로 본다. */
   function isDeliverableCompleteOnDate(row, dateStr) {
     if (!row) return false;
     const completedAt = normalizeCompletedAtDate(row.completedAt);
@@ -789,7 +789,7 @@
     return Math.round(base * 1.4);
   }
 
-  /** `.deliverable-editor`??`--deliverable-row-h`?� ?�일??바깥 ?�이(px). select/?�력???�이?� 맞춤. */
+  /** `.deliverable-editor`의 `--deliverable-row-h`와 동일한 바깥 높이(px). select/입력행 높이와 맞춤. */
   function getDeliverableRowOuterHeightPx(ta) {
     const ed = ta.closest(".deliverable-editor");
     if (!ed) return null;
@@ -809,7 +809,7 @@
     return null;
   }
 
-  /** ?�출물명: 줄바�??�동 ?�이, 최�? 5�????�크�?*/
+  /** 산출물명: 줄바꿈 자동 높이, 최대 5줄 후 스크롤 */
   function fitDeliverableNameField(ta) {
     if (!(ta instanceof HTMLTextAreaElement)) return;
     ta.style.overflowY = "hidden";
@@ -831,7 +831,7 @@
   }
 
   /** @param {HTMLTextAreaElement} ta */
-  /** ?�력??머리�?: ?�급 ??+ ?�출물명 ?�이 */
+  /** 입력행(머리줄): 등급 띠 + 산출물명 높이 */
   function refreshDeliverableHeaderUI() {
     syncDeliverableHeadImpBandFromSelect();
     if (deliverableNameInput instanceof HTMLTextAreaElement) {
@@ -843,14 +843,14 @@
     return deliverableEditorHead instanceof HTMLElement && !deliverableEditorHead.hidden;
   }
 
-  /** ?�출�??�력?��? ?�＋?��? ?��? ?�만 ?�린?? */
+  /** 산출물 입력행은 「＋」를 누를 때만 열린다. */
   function setDeliverableInputRowOpen(open, opts = {}) {
     if (!(deliverableEditorHead instanceof HTMLElement)) return;
     deliverableEditorHead.hidden = !open;
     if (btnDeliverableAddToggle instanceof HTMLElement) {
       btnDeliverableAddToggle.setAttribute("aria-expanded", open ? "true" : "false");
-      btnDeliverableAddToggle.textContent = open ? "?? : "??;
-      const label = open ? "?�출�??�력�??�기" : "?�출�??�력�??�기";
+      btnDeliverableAddToggle.textContent = open ? "➖" : "➕";
+      const label = open ? "산출물 입력칸 닫기" : "산출물 입력칸 열기";
       btnDeliverableAddToggle.setAttribute("aria-label", label);
       btnDeliverableAddToggle.title = label;
     }
@@ -869,7 +869,7 @@
   }
 
   /**
-   * ?�력????목록?�로 ?�려가???�동 ?�니메이??
+   * 입력행 → 목록으로 내려가는 이동 애니메이션.
    * @param {HTMLElement} fromEl
    * @param {HTMLElement} toEl
    * @param {{ name: string, importance: string }} payload
@@ -916,7 +916,7 @@
   }
 
   /**
-   * ?�력?�의 ?�용???�출�?목록??추�??�다.
+   * 입력행의 내용을 산출물 목록에 추가한다.
    * @param {{ keepFocus?: boolean, closeAfter?: boolean }} opts
    */
   function commitDeliverableFromInputRow(opts = {}) {
@@ -986,7 +986,7 @@
     );
   }
 
-  /** ?�력?��? ?�급??고르�??�까지 ?�색 박스�??�다. */
+  /** 입력행은 등급을 고르기 전까지 회색 박스로 둔다. */
   function syncDeliverableHeadImpBandFromSelect() {
     if (!(deliverableEditorHead instanceof HTMLElement)) return;
     deliverableEditorHead.classList.remove(
@@ -1120,7 +1120,6 @@
 
     let viewRows = normalizeDeliverables(task.deliverables);
     if (!viewRows.length) {
-      // ?�출�??�으�??�료 ?�태???�만 ?�일 ?�상공수�??�적?�로 본다
       return task.status === "done" ? totalMh / diffDaysInclusive(occ.start, occ.end) : 0;
     }
 
@@ -1143,7 +1142,8 @@
     const totalWeight = viewRows.reduce((acc, row) => acc + importanceWeight(row.importance), 0);
     if (totalWeight <= 0) return 0;
 
-    // 캡처 공식: (?�상MH / 중요?�합) × 그날 ?�료???�출�?중요?????�료?�에�?귀??    let spent = 0;
+    // (예상MH / 중요도합) × 그날 완료 산출물 중요도 — 완료일에만 귀속
+    let spent = 0;
     viewRows.forEach((row) => {
       const completedAt = normalizeCompletedAtDate(row.completedAt);
       const completedToday = completedAt ? completedAt === dateStr : !!row.done && dateStr === occ.start;
@@ -1200,14 +1200,14 @@
   const STATUS_ORDER = { ready: 0, "on-going": 1, done: 2 };
   const IMP_ORDER = { high: 0, medium: 1, low: 2 };
   const KR_FIXED_HOLIDAYS = [
-    { md: "01-01", name: "?�정", substitute: true },
-    { md: "03-01", name: "?�일??, substitute: true },
-    { md: "05-05", name: "?�린?�날", substitute: true },
-    { md: "06-06", name: "?�충??, substitute: true },
-    { md: "08-15", name: "광복??, substitute: true },
-    { md: "10-03", name: "개천??, substitute: true },
-    { md: "10-09", name: "?��???, substitute: true },
-    { md: "12-25", name: "?�탄??, substitute: true },
+    { md: "01-01", name: "신정", substitute: true },
+    { md: "03-01", name: "삼일절", substitute: true },
+    { md: "05-05", name: "어린이날", substitute: true },
+    { md: "06-06", name: "현충일", substitute: true },
+    { md: "08-15", name: "광복절", substitute: true },
+    { md: "10-03", name: "개천절", substitute: true },
+    { md: "10-09", name: "한글날", substitute: true },
+    { md: "12-25", name: "성탄절", substitute: true },
   ];
 
   function sortTasksForDots(list) {
@@ -1225,7 +1225,7 @@
   const MAX_CALENDAR_DOTS = 8;
 
   /**
-   * ?�력 ?� ?�그?��??� ?�일??목록·?�서(최�? MAX_CALENDAR_DOTS).
+   * 달력 셀 동그라미와 동일한 목록·순서(최대 MAX_CALENDAR_DOTS).
    * @param {string} dateStr
    * @returns {Task[]}
    */
@@ -1262,7 +1262,7 @@
         if (!blocked) break;
         cand = addDaysStr(cand, 1);
       }
-      out.set(cand, `${h.name} ?�체휴??);
+      out.set(cand, `${h.name} 대체휴일`);
     });
     return out;
   }
@@ -1277,19 +1277,19 @@
   }
 
   function importanceLabel(imp) {
-    if (imp === "high") return "??;
-    if (imp === "low") return "??;
-    return "�?;
+    if (imp === "high") return "상";
+    if (imp === "low") return "하";
+    return "중";
   }
 
   function recurrenceLabel(rec) {
     if (rec === "daily") return "매일";
     if (rec === "weekly") return "매주";
     if (rec === "monthly") return "매월";
-    return "반복 ?�음";
+    return "반복 없음";
   }
 
-  /** ?�력: 바깥 �?= 중요???�기), ?�쪽 ??= 진행 ?�태 ??*/
+  /** 달력: 바깥 링 = 중요도(크기), 안쪽 점 = 진행 상태 색 */
   function importanceWrapClass(imp) {
     if (imp === "high") return "calendar-cell__dot-wrap calendar-cell__dot-wrap--high";
     if (imp === "low") return "calendar-cell__dot-wrap calendar-cell__dot-wrap--low";
@@ -1520,9 +1520,9 @@
     }
 
     const groups = [
-      { rec: "daily", title: "반복 ?�장 ?�인", msg: "매일 반복???�주 ?�장?�건가??" },
-      { rec: "weekly", title: "반복 ?�장 ?�인", msg: "매주 반복???�달 ?�장?�건가??" },
-      { rec: "monthly", title: "반복 ?�장 ?�인", msg: "매월 반복???�년 ?�장?�건가??" },
+      { rec: "daily", title: "반복 연장 확인", msg: "매일 반복을 한주 연장할건가요?" },
+      { rec: "weekly", title: "반복 연장 확인", msg: "매주 반복을 한달 연장할건가요?" },
+      { rec: "monthly", title: "반복 연장 확인", msg: "매월 반복을 일년 연장할건가요?" },
     ];
     const state = loadRecurrenceAlertState();
     let changed = false;
@@ -1592,7 +1592,7 @@
 
   async function ensureFirebaseAnonymousAuth(app) {
     if (!window.firebase || !window.firebase.auth) {
-      throw new Error("Firebase Auth SDK가 로드?��? ?�았?�니??");
+      throw new Error("Firebase Auth SDK가 로드되지 않았습니다.");
     }
     const auth = window.firebase.auth(app);
     if (auth.currentUser) return auth.currentUser;
@@ -1602,7 +1602,7 @@
 
   async function loadTasks() {
     if (!window.firebase || !window.firebase.apps) {
-      console.error("Firebase SDK가 로드?��? ?�았?�니??");
+      console.error("Firebase SDK가 로드되지 않았습니다.");
       return;
     }
     const app = window.firebase.apps.length ? window.firebase.app() : window.firebase.initializeApp(FIREBASE_CONFIG);
@@ -1611,8 +1611,8 @@
     } catch (err) {
       console.error("Firebase anonymous auth failed:", err);
       alert(
-        "Firebase ?�명 로그?�에 ?�패?�습?�다.\n" +
-          "Firebase Console ??Authentication ??Sign-in method ?�서 Anonymous �??�성?�해 주세??\n\n" +
+        "Firebase 익명 로그인에 실패했습니다.\n" +
+          "Firebase Console → Authentication → Sign-in method 에서 Anonymous 를 활성화해 주세요.\n\n" +
           (err && err.message ? err.message : String(err))
       );
       return;
@@ -1635,14 +1635,14 @@
       (err) => {
         console.error("Firebase sync error:", err);
         alert(
-          "Firebase ?�이???�기?�에 ?�패?�습?�다.\n" +
-            "Realtime Database Rules ?�서 auth != null ????shared-calendar ?�기/?�기�??�용??주세??\n\n" +
+          "Firebase 데이터 동기화에 실패했습니다.\n" +
+            "Realtime Database Rules 에서 auth != null 일 때 shared-calendar 읽기/쓰기를 허용해 주세요.\n\n" +
             (err && err.message ? err.message : String(err))
         );
       }
     );
 
-    // 메�? 경로가 ?�더?�도 ?�성?????�도�?no-op write 보장
+    // 메타 경로가 없더라도 생성될 수 있도록 no-op write 보장
     metaRef.update({ connectedAt: new Date().toISOString() }).catch((err) => {
       console.error("Firebase meta update failed:", err);
     });
@@ -1697,7 +1697,7 @@
     const start = Date.now();
     while (!firebaseDb || !firebaseTasksRef) {
       if (Date.now() - start > timeoutMs) {
-        throw new Error("Firebase ?�결???�직 준비되지 ?�았?�니?? ?�시 ???�시 ?�도??주세??");
+        throw new Error("Firebase 연결이 아직 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.");
       }
       await new Promise((r) => setTimeout(r, 120));
     }
@@ -1723,7 +1723,7 @@
     const title = (t.title || "").trim();
     if (title) return title;
     const d = (t.description || "").trim();
-    return d ? d.slice(0, 48) : "(?�목 ?�음)";
+    return d ? d.slice(0, 48) : "(제목 없음)";
   }
 
   function matchesSearch(task) {
@@ -1973,7 +1973,7 @@
     const attachLineInteractions = (line, task, openDs) => {
       const impKey = task.importance === "high" ? "high" : task.importance === "low" ? "low" : "medium";
       const stKey = task.status === "on-going" ? "ongoing" : task.status === "done" ? "done" : "ready";
-      line.dataset.tipToken = "??";
+      line.dataset.tipToken = "■ ";
       line.dataset.tipBody = `${taskLabel(task)}`;
       line.classList.add(`calendar-range-line--tip-${stKey}`, `calendar-range-line--tip-imp-${impKey}`);
       line.tabIndex = 0;
@@ -2045,7 +2045,7 @@
       return;
     }
 
-    // --- Phase 4: hard verify ??bars must stay above dots ---
+    // --- Phase 4: hard verify — bars must stay above dots ---
     if (barDotLayoutFixAttempts < 24) {
       /** @type {Record<number, number>} */
       const growByRow = {};
@@ -2128,7 +2128,8 @@
         const c = tasks.filter((t) => taskCoversDate(t, ds)).length;
         if (c > maxTasks) maxTasks = c;
 
-        // ?��??�제 ?�더 ?�단(?�짜 ?�자/공휴?�명/?�측 배�?)??측정??        // ?�평�??�택 + ?�단 dot ?�역 보호 ?�이�?계산?�다.
+        // 셀별 실제 헤더 하단(날짜 숫자/공휴일명/우측 배지)을 측정해
+        // 수평바 스택 + 하단 dot 영역 보호 높이를 계산한다.
         const numEl = /** @type {HTMLElement | null} */ (cell.querySelector(".calendar-cell__num"));
         const holidayEl = /** @type {HTMLElement | null} */ (cell.querySelector(".calendar-cell__holiday-name"));
         const badgeEl = /** @type {HTMLElement | null} */ (cell.querySelector(".calendar-cell__ongoing-count"));
@@ -2145,7 +2146,7 @@
         if (dotsHeight > maxDotsHeight) maxDotsHeight = dotsHeight;
         const headerGap = 7;
         const spacerH = spacerEl ? Math.max(0, spacerEl.offsetHeight) : laneStackHeight;
-        // ?�짜�?dot 개수(1�?2�?3�????�라 ?�제 ?�단 보호 ?�이�?반영?�다.
+        // 날짜별 dot 개수(1줄/2줄/3줄)에 따라 실제 하단 보호 높이를 반영한다.
         const dotSafe = Math.max(24, dotsHeight + 18);
         const cellRequired = contentBottom + headerGap + Math.max(laneStackHeight, spacerH) + dotSafe;
         if (cellRequired > rowRequiredHeight) rowRequiredHeight = cellRequired;
@@ -2154,7 +2155,7 @@
       const rowBase = rowBaseTop[row] || 0;
       const laneStackBottom = rowBase + (lanes > 0 ? (lanes - 1) * lineStep + barHeight : 0);
       const dotsBlock = Math.max(20, maxDotsHeight);
-      // ?�그?��???"마�?�??�평�??�단 + ?�유" ?�래?�서 ?�작?�야 ?�다.
+      // 동그라미는 "마지막 수평바 하단 + 여유" 아래에서 시작해야 한다.
       const strictRowHeight = laneStackBottom + 14 + dotsBlock + 56;
       const taskExtra = Math.max(0, maxTasks - 4) * 6;
       const h = Math.max(108, 92 + taskExtra, strictRowHeight, rowRequiredHeight) + (rowOverflowPx[row] || 0);
@@ -2245,8 +2246,8 @@
       dateInput.type = "date";
       dateInput.className = "deliverable-item__completed-at";
       dateInput.value = completedAt || "";
-      dateInput.title = "?�출�??�산?�료?�자";
-      dateInput.setAttribute("aria-label", "?�출�??�산?�료?�자");
+      dateInput.title = "산출물 생산완료일자";
+      dateInput.setAttribute("aria-label", "산출물 생산완료일자");
       const seedTaskStartDate = () => {
         if (dateInput.value) return;
         const start =
@@ -2264,17 +2265,17 @@
       nameTa.rows = 1;
       nameTa.spellcheck = false;
       nameTa.value = row.name || "";
-      nameTa.placeholder = "?�출물명";
+      nameTa.placeholder = "산출물명";
 
       const impSelect = document.createElement("select");
       impSelect.className = "deliverable-item__importance-select";
-      impSelect.innerHTML = `<option value="high">??/option><option value="medium">�?/option><option value="low">??/option>`;
+      impSelect.innerHTML = `<option value="high">상</option><option value="medium">중</option><option value="low">하</option>`;
       impSelect.value = row.importance === "high" || row.importance === "low" ? row.importance : "medium";
 
       const delBtn = document.createElement("button");
       delBtn.type = "button";
       delBtn.className = "deliverable-item__delete";
-      delBtn.textContent = "??��";
+      delBtn.textContent = "삭제";
 
       li.appendChild(dateInput);
       li.appendChild(nameTa);
@@ -2420,14 +2421,14 @@
     }
 
     searchResults.hidden = false;
-    searchCount.textContent = `(${hits.length}�?`;
+    searchCount.textContent = `(${hits.length}건)`;
     searchResultsList.innerHTML = "";
 
     if (hits.length === 0) {
       const li = document.createElement("li");
       li.className = "search-hit__meta";
       li.style.padding = "0.35rem 0.5rem";
-      li.textContent = "조건??맞는 ?�정???�습?�다.";
+      li.textContent = "조건에 맞는 일정이 없습니다.";
       searchResultsList.appendChild(li);
       return;
     }
@@ -2444,7 +2445,7 @@
         t.recurrence && t.recurrence !== "none"
           ? ` · 반복: ${recurrenceLabel(t.recurrence)}${t.recurrenceUntil ? " ~ " + t.recurrenceUntil : ""}`
           : "";
-      btn.innerHTML = `<div class="search-hit__title">${escapeHtml(lab)}</div><div class="search-hit__meta">${escapeHtml(t.status)} · 중요??${escapeHtml(importanceLabel(t.importance))} · ${t.startDate} ~ ${t.endDate}${escapeHtml(rec)}</div>`;
+      btn.innerHTML = `<div class="search-hit__title">${escapeHtml(lab)}</div><div class="search-hit__meta">${escapeHtml(t.status)} · 중요도 ${escapeHtml(importanceLabel(t.importance))} · ${t.startDate} ~ ${t.endDate}${escapeHtml(rec)}</div>`;
       btn.addEventListener("click", () => {
         const anchor = parseDateStr(t.startDate);
         viewYear = anchor.getFullYear();
@@ -2465,7 +2466,7 @@
     const pad = first.getDay();
     const daysInMonth = last.getDate();
 
-    monthTitle.textContent = `${viewYear}??${viewMonth + 1}??;
+    monthTitle.textContent = `${viewYear}년 ${viewMonth + 1}월`;
 
     const prevLast = new Date(viewYear, viewMonth, 0).getDate();
     for (let i = 0; i < pad; i++) {
@@ -2552,7 +2553,7 @@
     });
   }
 
-  /** on-going�? ??3 · �?2 · ??1???�산 */
+  /** on-going만: 상 3 · 중 2 · 하 1점 합산 */
   function ongoingImportanceScore(ongoingTasks) {
     let s = 0;
     ongoingTasks.forEach((t) => {
@@ -2581,10 +2582,10 @@
     const maxLines = 15;
     const lines = dayEffortRows.map((x) => `${taskLabel(x.task)} (${formatMh(x.spentDailyMh)}/${formatMh(x.dailyMh)}MH)`);
     const shown = lines.slice(0, maxLines);
-    let tip = `?�일 공수 ${formatMh(spentDailyMh)}/${formatMh(totalDailyMh)}MH (?�입/?�상)`;
-    tip += "\n?�?�?�?�?�?�?�?�\n";
+    let tip = `당일 공수 ${formatMh(spentDailyMh)}/${formatMh(totalDailyMh)}MH (투입/예상)`;
+    tip += "\n────────\n";
     tip += shown.map((lab, i) => `${i + 1}. ${lab}`).join("\n");
-    if (lines.length > maxLines) tip += `\n????${lines.length - maxLines}�?;
+    if (lines.length > maxLines) tip += `\n… 외 ${lines.length - maxLines}건`;
     return tip;
   }
 
@@ -2606,7 +2607,7 @@
         ongoingEl.title = buildDailyMhBadgeTooltip(allEffortRows, spentDailyMh, totalDailyMh);
         ongoingEl.setAttribute(
           "aria-label",
-          `${dateStr} ?�일 공수 ${formatMh(spentDailyMh)}/${formatMh(totalDailyMh)}MH (?�입/?�상): ${allEffortRows.map((x) => taskLabel(x.task)).join(", ")}`
+          `${dateStr} 당일 공수 ${formatMh(spentDailyMh)}/${formatMh(totalDailyMh)}MH (투입/예상): ${allEffortRows.map((x) => taskLabel(x.task)).join(", ")}`
         );
       } else {
         ongoingEl.textContent = "";
@@ -2647,7 +2648,7 @@
         wrap.type = "button";
         wrap.className = importanceWrapClass(t.importance || "medium");
         const impKey = t.importance === "high" ? "high" : t.importance === "low" ? "low" : "medium";
-        const impToken = "??";
+        const impToken = "■ ";
         const stKey = t.status === "on-going" ? "ongoing" : t.status === "done" ? "done" : "ready";
         wrap.dataset.tipToken = impToken;
         wrap.dataset.tipBody = `${taskLabel(t)}`;
@@ -2677,9 +2678,9 @@
           cell.classList.remove("calendar-cell--tip-active");
         });
         const openFromDot = () => openModal(dateStr, t.id);
-        // ?�그?��???커스?� ?�로???�팁???��? ?�는??
-        // (?�평�??�팁 ?�류/?�트리거?� 충돌 방�?)
-        // ?�그?��? ?�릭 ???�당 task�?바로 ?�집 모드�??�다.
+        // 동그라미는 커스텀 플로팅 툴팁을 쓰지 않는다.
+        // (수평바 툴팁 잔류/재트리거와 충돌 방지)
+        // 동그라미 클릭 시 해당 task를 바로 편집 모드로 연다.
         wrap.addEventListener("click", (e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -2702,7 +2703,7 @@
         const more = document.createElement("span");
         more.className = "calendar-cell__more";
         more.textContent = "+" + (fullSorted.length - MAX_CALENDAR_DOTS);
-        more.title = `??${fullSorted.length - MAX_CALENDAR_DOTS}�?;
+        more.title = `외 ${fullSorted.length - MAX_CALENDAR_DOTS}건`;
         dots.appendChild(more);
       }
     }
@@ -2715,7 +2716,7 @@
     updateTopbarDatePill();
 
     const ymd = parseDateStr(dateStr);
-    modalDateHint.textContent = `${ymd.getFullYear()}??${ymd.getMonth() + 1}??${ymd.getDate()}??;
+    modalDateHint.textContent = `${ymd.getFullYear()}년 ${ymd.getMonth() + 1}월 ${ymd.getDate()}일`;
 
     const fillFormFromTask = (t) => {
       taskTitle.value = t.title || "";
@@ -2752,7 +2753,7 @@
         taskRecurrence.value = "none";
         updateActualEffortPreview();
       } else {
-      // ?�당 ?�짜???�정???�으�?�???��??기본 ?�택(?�짜 변�?즉시 ?�집 가??
+      // 해당 날짜에 일정이 있으면 첫 항목을 기본 선택(날짜 변경 즉시 편집 가능)
       const onDay = tasks
         .filter((t) => taskCoversDate(t, dateStr))
         .sort((a, b) => {
@@ -2832,7 +2833,7 @@
         (t.id === editingId ? " task-chip--active" : "") +
         (overdue ? " task-chip--overdue" : "");
       const lab = taskLabel(t);
-      const short = lab.length > 42 ? lab.slice(0, 40) + "?? : lab;
+      const short = lab.length > 42 ? lab.slice(0, 40) + "…" : lab;
       const recBadge = t.recurrence && t.recurrence !== "none" ? ` · ${recurrenceLabel(t.recurrence)}` : "";
       const imp = t.importance || "medium";
       const effortBadge =
@@ -2840,7 +2841,7 @@
           ? ` · ${escapeHtml(String(t.effortValue))}${escapeHtml(t.effortUnit === "MD" ? "MD" : "MH")}`
           : "";
       btn.innerHTML = `<span class="task-chip__desc"><span class="task-chip__imp task-chip__imp--${imp}" aria-hidden="true"></span>${escapeHtml(short)}${escapeHtml(recBadge)}${effortBadge}</span><span class="task-chip__status">${escapeHtml(t.status)}</span>`;
-      btn.title = "?�릭: ?�세 ?�집 · ?�버: ?�태/중요????��";
+      btn.title = "클릭: 상세 편집 · 호버: 상태/중요도/삭제";
       btn.addEventListener("click", () => {
         editingId = t.id;
         modalDefaultWhite = false;
@@ -2868,7 +2869,7 @@
       quick.setAttribute("role", "tooltip");
       const statusRow = document.createElement("div");
       statusRow.className = "task-chip__quick-row";
-      statusRow.innerHTML = `<span class="task-chip__quick-label">?�태</span>`;
+      statusRow.innerHTML = `<span class="task-chip__quick-label">상태</span>`;
       STATUS_CHOICES.forEach((st) => {
         const q = document.createElement("button");
         q.type = "button";
@@ -2895,7 +2896,7 @@
       impRow.className = "task-chip__quick-row";
       const impLabel = document.createElement("span");
       impLabel.className = "task-chip__quick-label";
-      impLabel.textContent = "중요??;
+      impLabel.textContent = "중요도";
       impRow.appendChild(impLabel);
       IMP_CHOICES.forEach((impKey) => {
         const iq = document.createElement("button");
@@ -2923,13 +2924,13 @@
       const del = document.createElement("button");
       del.type = "button";
       del.className = "task-chip__quick-btn task-chip__quick-btn--danger";
-      del.textContent = "??��";
+      del.textContent = "삭제";
       del.addEventListener("click", async (e) => {
         e.preventDefault();
         e.stopPropagation();
-        const ok = await openConfirmDialog(`"${taskLabel(t)}" ?�정????��?�까??`, {
-          title: "??�� ?�인",
-          okLabel: "??��",
+        const ok = await openConfirmDialog(`"${taskLabel(t)}" 일정을 삭제할까요?`, {
+          title: "삭제 확인",
+          okLabel: "삭제",
           cancelLabel: "취소",
           showCancel: true,
         });
@@ -2960,8 +2961,8 @@
 
   function openConfirmDialog(message, opts) {
     const options = {
-      title: "?�인",
-      okLabel: "?�인",
+      title: "확인",
+      okLabel: "확인",
       cancelLabel: "취소",
       showCancel: true,
       ...opts,
@@ -3003,16 +3004,16 @@
     });
   }
 
-  async function openAlertDialog(message, title = "?�력 ?�인") {
+  async function openAlertDialog(message, title = "입력 확인") {
     await openConfirmDialog(message, {
       title,
-      okLabel: "?�인",
+      okLabel: "확인",
       showCancel: false,
     });
   }
 
   async function loadGeminiKey() {
-    // ?�전 비�???모드: ?�도 메모리에?�만 ?�용
+    // 완전 비저장 모드: 키도 메모리에서만 사용
     return geminiKeyCache;
   }
 
@@ -3029,14 +3030,14 @@
     if (Array.isArray(parsed)) return parsed;
     if (parsed && Array.isArray(parsed.tasks)) return parsed.tasks;
     if (parsed && Array.isArray(parsed.items)) return parsed.items;
-    throw new Error("JSON 배열 ?�식???�닙?�다.");
+    throw new Error("JSON 배열 형식이 아닙니다.");
   }
 
   /**
-   * OCR ?�짜 문자?�을 YYYY-MM-DD�??�규?�한??
+   * OCR 날짜 문자열을 YYYY-MM-DD로 정규화한다.
    * - YYYY-MM-DD
    * - YYYY/M/D, YYYY.M.D
-   * - M-D, M/D, M.D, M??D?? -> fallbackYear ?�용
+   * - M-D, M/D, M.D, M월 D일  -> fallbackYear 사용
    * @param {unknown} raw
    * @param {number} fallbackYear
    * @returns {string}
@@ -3053,7 +3054,7 @@
       if (m < 1 || m > 12 || d < 1 || d > 31) return "";
       return `${y}-${pad2(m)}-${pad2(d)}`;
     }
-    const md = s.match(/^(\d{1,2})[-/.](\d{1,2})$/) || s.match(/^(\d{1,2})??s*(\d{1,2})??/);
+    const md = s.match(/^(\d{1,2})[-/.](\d{1,2})$/) || s.match(/^(\d{1,2})월\s*(\d{1,2})일$/);
     if (md) {
       const m = Number(md[1]);
       const d = Number(md[2]);
@@ -3103,26 +3104,26 @@
   }
 
   /**
-   * @param {string} base64 ??Data URL ???�닌 ?�수 base64
+   * @param {string} base64 — Data URL 이 아닌 순수 base64
    * @param {string} mimeType
    * @param {string} apiKey
    */
   async function runGeminiOcr(base64, mimeType, apiKey) {
     const todayStr = toDateStrFromDate(new Date());
-    const prompt = `???��?지???��?�??�힌 ?�일 목록(?��????�는 ?�쇄)?�니?? 모든 ?�일???�어 JSON 배열�?출력?�세??
+    const prompt = `이 이미지는 한글로 적힌 할일 목록(손글씨 또는 인쇄)입니다. 모든 할일을 읽어 JSON 배열만 출력하세요.
 
-?�키�? �??�소??{"title": string, "startDate": "YYYY-MM-DD", "endDate": "YYYY-MM-DD", "status": "ready"|"on-going"|"done", "importance": "high"|"medium"|"low", "effortValue": number, "effortUnit": "MH"|"MD", "description": string, "confidence": number}
+스키마: 각 원소는 {"title": string, "startDate": "YYYY-MM-DD", "endDate": "YYYY-MM-DD", "status": "ready"|"on-going"|"done", "importance": "high"|"medium"|"low", "effortValue": number, "effortUnit": "MH"|"MD", "description": string, "confidence": number}
 규칙:
-- ?�짜가 ?��? ?�으�?�??�짜�??�용?�니?? 같�? ?�짜 ?�래???�러 줄이 ?�으�?각각 별도 ??��?�로 ?�고 같�? startDate?� endDate�??�니??
-- ?�도가 ?�는 ?�짜(?? 5/4, 5??4?????�재 ?�력 ?�면???�도(${viewYear})�?붙여 YYYY-MM-DD�?만듭?�다.
-- ?�짜가 ?��? ?�으�?startDate/endDate??�?문자?�로 ?�니??
-- ??줄에 ?�짜?� ?�목??같이 ?�으�?�??�짜??�??�목???�습?�다.
-- status???�별 가?�할 ??채우�? ?�매?�면 "ready"�??�니??
-- importance???�별 가?�할 ?�만 채우�? ?�매?�면 "medium"?�로 ?�니??
-- effortValue/effortUnit?� ?��? ?�을 ??채우�? ?�으�?effortValue??4, effortUnit?� "MH"�??�니??
-- description?� 부가 메모가 ?�을 ?�만 채우�??�으�?�?문자??
-- confidence???�당 ??�� ?�식 ?�뢰??0~1 ?�는 0~100 ?�자)�??�습?�다.
-- JSON 배열�?출력?�고 ?�른 ?�명?� ?��? 마세??`;
+- 날짜가 적혀 있으면 그 날짜를 사용합니다. 같은 날짜 아래에 여러 줄이 있으면 각각 별도 항목으로 두고 같은 startDate와 endDate를 씁니다.
+- 연도가 없는 날짜(예: 5/4, 5월 4일)는 현재 달력 화면의 연도(${viewYear})를 붙여 YYYY-MM-DD로 만듭니다.
+- 날짜가 전혀 없으면 startDate/endDate는 빈 문자열로 둡니다.
+- 한 줄에 날짜와 제목이 같이 있으면 그 날짜에 그 제목을 넣습니다.
+- status는 판별 가능할 때 채우고, 애매하면 "ready"로 둡니다.
+- importance는 판별 가능할 때만 채우고, 애매하면 "medium"으로 둡니다.
+- effortValue/effortUnit은 적혀 있을 때 채우고, 없으면 effortValue는 4, effortUnit은 "MH"로 둡니다.
+- description은 부가 메모가 있을 때만 채우고 없으면 빈 문자열.
+- confidence는 해당 항목 인식 신뢰도(0~1 또는 0~100 숫자)로 넣습니다.
+- JSON 배열만 출력하고 다른 설명은 쓰지 마세요.`;
 
     let discovered = [];
     try {
@@ -3170,7 +3171,7 @@
 
       if (!res.ok) {
         const msg = String(data.error?.message || JSON.stringify(data) || `HTTP ${res.status}`);
-        // ?��? 모델?� responseMimeType 지?�이 ?�한?????�어 ??�???plain ?�출
+        // 일부 모델은 responseMimeType 지원이 제한될 수 있어 한 번 더 plain 호출
         if (/response.?mime|generationconfig|invalid json payload/i.test(msg)) {
           res = await fetch(url, {
             method: "POST",
@@ -3189,7 +3190,7 @@
 
       const cand = data.candidates?.[0];
       if (!cand) {
-        lastErr = `[${model}] ?�답???�보가 ?�습?�다.`;
+        lastErr = `[${model}] 응답에 후보가 없습니다.`;
         continue;
       }
       if (cand.finishReason && cand.finishReason !== "STOP") {
@@ -3197,13 +3198,13 @@
       }
       const text = cand.content?.parts?.[0]?.text;
       if (text == null || String(text).trim() === "") {
-        lastErr = `[${model}] ?�답 ?�스?��? 비어 ?�습?�다.`;
+        lastErr = `[${model}] 응답 텍스트가 비어 있습니다.`;
         continue;
       }
       const arr = parseGeminiJsonArray(String(text));
       return arr.map((o) => coerceOcrItem(o, todayStr));
     }
-    throw new Error(lastErr || "?�용 가?�한 Gemini 모델??찾�? 못했?�니??");
+    throw new Error(lastErr || "사용 가능한 Gemini 모델을 찾지 못했습니다.");
   }
 
   function renderOcrDraftList() {
@@ -3213,16 +3214,16 @@
       li.className = "ocr-draft-item";
       const idPrefix = `ocr-${index}`;
       li.innerHTML = `
-        <label class="ocr-draft-check"><input type="checkbox" class="ocr-draft-cb" checked data-index="${index}" /> ?�함</label>
+        <label class="ocr-draft-check"><input type="checkbox" class="ocr-draft-cb" checked data-index="${index}" /> 포함</label>
         <div class="ocr-draft-fields">
-          <div class="ocr-draft-confidence" title="OCR ?�뢰??>?�뢰??${Math.max(1, Math.min(99, Math.round(Number(row.confidence || 0))))}%</div>
+          <div class="ocr-draft-confidence" title="OCR 신뢰도">신뢰도 ${Math.max(1, Math.min(99, Math.round(Number(row.confidence || 0))))}%</div>
           <input type="text" class="toolbar__input ocr-draft-title" data-index="${index}" id="${idPrefix}-title" />
           <div class="ocr-draft-dates">
-            <label class="ocr-draft-date-lab">?�작 <input type="date" class="ocr-draft-start" data-index="${index}" id="${idPrefix}-s" /></label>
-            <label class="ocr-draft-date-lab">?�료 <input type="date" class="ocr-draft-end" data-index="${index}" id="${idPrefix}-e" /></label>
+            <label class="ocr-draft-date-lab">시작 <input type="date" class="ocr-draft-start" data-index="${index}" id="${idPrefix}-s" /></label>
+            <label class="ocr-draft-date-lab">완료 <input type="date" class="ocr-draft-end" data-index="${index}" id="${idPrefix}-e" /></label>
           </div>
           <div class="ocr-draft-meta">
-            <label>?�태
+            <label>상태
               <select class="ocr-draft-status" data-index="${index}">
                 <option value="">(빈칸)</option>
                 <option value="ready">ready</option>
@@ -3230,24 +3231,25 @@
                 <option value="done">done</option>
               </select>
             </label>
-            <label>중요??              <select class="ocr-draft-imp" data-index="${index}">
+            <label>중요도
+              <select class="ocr-draft-imp" data-index="${index}">
                 <option value="">(빈칸)</option>
-                <option value="high">??/option>
-                <option value="medium">�?/option>
-                <option value="low">??/option>
+                <option value="high">상</option>
+                <option value="medium">중</option>
+                <option value="low">하</option>
               </select>
             </label>
             <label>공수
-              <input type="number" class="ocr-draft-effort" data-index="${index}" min="0" step="0.25" placeholder="빈칸 가?? />
+              <input type="number" class="ocr-draft-effort" data-index="${index}" min="0" step="0.25" placeholder="빈칸 가능" />
             </label>
-            <label>?�위
+            <label>단위
               <select class="ocr-draft-effort-unit" data-index="${index}">
                 <option value="MH">MH</option>
                 <option value="MD">MD</option>
               </select>
             </label>
           </div>
-          <textarea class="ocr-draft-desc" rows="2" data-index="${index}" placeholder="?�명(?�택)"></textarea>
+          <textarea class="ocr-draft-desc" rows="2" data-index="${index}" placeholder="설명(선택)"></textarea>
         </div>`;
       ocrDraftList.appendChild(li);
       const titleEl = li.querySelector(".ocr-draft-title");
@@ -3294,7 +3296,7 @@
       const finalStart = startDraft || endDraft || toDateStrFromDate(new Date());
       const finalEnd = endDraft || startDraft || finalStart;
       const payload = {
-        title: (title && title.value.trim()) || "(?�목 ?�음)",
+        title: (title && title.value.trim()) || "(제목 없음)",
         startDate: finalStart,
         endDate: finalEnd,
         status: st && ["ready", "on-going", "done"].includes(st.value) ? st.value : "ready",
@@ -3357,7 +3359,7 @@
   function openCameraCapture() {
     if (!(cameraFileInput instanceof HTMLInputElement)) return;
     if (!("mediaDevices" in navigator)) {
-      openAlertDialog("??기기/브라?��???카메??촬영??지?�하지 ?�습?�다.");
+      openAlertDialog("이 기기/브라우저는 카메라 촬영을 지원하지 않습니다.");
       return;
     }
     openOcrModal();
@@ -3375,7 +3377,7 @@
   }
 
   async function saveFromModal() {
-    // ?�력칸에 ?�아 ?�는 ?�출물도 ?�???�?�에 ?�함?�다.
+    // 입력칸에 남아 있는 산출물도 저장 대상에 포함한다.
     commitDeliverableFromInputRow();
     const title = taskTitle.value.trim();
     const status = getCurrentStatus();
@@ -3392,7 +3394,7 @@
     const deliverables = collectDeliverablesFromModal();
 
     if (effortInputRaw === "") {
-      await openAlertDialog("?�입?�상공수�??�력??주세??");
+      await openAlertDialog("투입예상공수를 입력해 주세요.");
       if (taskEffortValue instanceof HTMLInputElement) {
         taskEffortValue.focus();
         taskEffortValue.select();
@@ -3400,23 +3402,23 @@
       return;
     }
 
-    // ????��?�서 ?�목/?�명??모두 비면 ?�?�하지 ?�고 ?�는??(?�령 ??�� ?�성 방�?)
+    // 새 항목에서 제목/설명이 모두 비면 저장하지 않고 닫는다 (유령 항목 생성 방지)
     if (!editingId && !title && !description && !effortValue && deliverables.length === 0) {
       closeModal();
       return;
     }
 
     if (taskEffortValue.value.trim() !== "" && (!Number.isFinite(effortRaw) || effortRaw <= 0)) {
-      await openAlertDialog("?�입?�상공수??0보다 ???�자�??�력??주세??");
+      await openAlertDialog("투입예상공수는 0보다 큰 숫자로 입력해 주세요.");
       return;
     }
 
     if (!startDate || !endDate) {
-      await openAlertDialog("?�작?�과 ?�료?�을 모두 ?�택??주세??");
+      await openAlertDialog("시작일과 완료일을 모두 선택해 주세요.");
       return;
     }
     if (parseDateStr(startDate) > parseDateStr(endDate)) {
-      await openAlertDialog("?�작?�이 ?�료?�보????�� ???�습?�다.");
+      await openAlertDialog("시작일이 완료일보다 늦을 수 없습니다.");
       return;
     }
 
@@ -3496,9 +3498,9 @@
 
   async function deleteTask() {
     if (!editingId) return;
-    const ok = await openConfirmDialog("???�정????��?�까?? 반복 ?�정?�면 ?�체 ?�리즈�? ??��?�니??", {
-      title: "??�� ?�인",
-      okLabel: "??��",
+    const ok = await openConfirmDialog("이 일정을 삭제할까요? 반복 일정이면 전체 시리즈가 삭제됩니다.", {
+      title: "삭제 확인",
+      okLabel: "삭제",
       cancelLabel: "취소",
       showCancel: true,
     });
@@ -3519,7 +3521,7 @@
     taskTitle.focus();
   });
 
-  /* ?�?� ?�작??종료?? 마우?��? ?�리�??�는 ?�력(?�래그로 기간 지?? ?�?�?�?�?�?�?�?�?�?�?�?�?� */
+  /* ── 시작일/종료일: 마우스를 올리면 뜨는 달력(드래그로 기간 지정) ───────────── */
 
   const DATE_POP_CLOSE_DELAY_MS = 180;
   /** @type {HTMLElement | null} */
@@ -3536,7 +3538,7 @@
   let datePopCloseTimer = null;
   /** @type {{ anchor: string, hover: string } | null} */
   let datePopDrag = null;
-  /** 마우???�릭 직후??focus 로는 ?�력???�시 ?��? ?�는??기본 ?�력�?충돌 방�?). */
+  /** 마우스 클릭 직후의 focus 로는 달력을 다시 열지 않는다(기본 달력과 충돌 방지). */
   let datePopFocusSuppressUntil = 0;
 
   function isDatePopOpen() {
@@ -3575,24 +3577,24 @@
     pop.id = "datePop";
     pop.hidden = true;
     pop.setAttribute("role", "dialog");
-    pop.setAttribute("aria-label", "?�짜 ?�택");
+    pop.setAttribute("aria-label", "날짜 선택");
     pop.innerHTML = `
       <div class="date-pop__head">
-        <button type="button" class="date-pop__nav" data-nav="-1" aria-label="?�전 ??>??/button>
+        <button type="button" class="date-pop__nav" data-nav="-1" aria-label="이전 달">‹</button>
         <span class="date-pop__title"></span>
-        <button type="button" class="date-pop__nav" data-nav="1" aria-label="?�음 ??>??/button>
+        <button type="button" class="date-pop__nav" data-nav="1" aria-label="다음 달">›</button>
       </div>
       <div class="date-pop__weekdays">
-        <span class="date-pop__weekday date-pop__weekday--sun">??/span>
-        <span class="date-pop__weekday">??/span>
-        <span class="date-pop__weekday">??/span>
-        <span class="date-pop__weekday">??/span>
-        <span class="date-pop__weekday">�?/span>
-        <span class="date-pop__weekday">�?/span>
-        <span class="date-pop__weekday date-pop__weekday--sat">??/span>
+        <span class="date-pop__weekday date-pop__weekday--sun">일</span>
+        <span class="date-pop__weekday">월</span>
+        <span class="date-pop__weekday">화</span>
+        <span class="date-pop__weekday">수</span>
+        <span class="date-pop__weekday">목</span>
+        <span class="date-pop__weekday">금</span>
+        <span class="date-pop__weekday date-pop__weekday--sat">토</span>
       </div>
       <div class="date-pop__grid"></div>
-      <p class="date-pop__hint">?�릭: ?�짜 지??· ?�래�? ?�작??종료??지??/p>
+      <p class="date-pop__hint">클릭: 날짜 지정 · 드래그: 시작일~종료일 지정</p>
     `;
     document.body.appendChild(pop);
     datePopEl = pop;
@@ -3618,7 +3620,7 @@
         if (!(day instanceof HTMLElement) || !day.dataset.date) return;
         e.preventDefault();
         datePopDrag = { anchor: day.dataset.date, hover: day.dataset.date };
-        // ???�벤?��? 문서까�? ?�파?�는 ?�안 ?�린 버튼???�라지지 ?�도�??�음 ?�레?�에 ?�시 그린??
+        // 이 이벤트가 문서까지 전파되는 동안 눌린 버튼이 사라지지 않도록 다음 프레임에 다시 그린다.
         requestAnimationFrame(() => {
           if (datePopDrag) renderDatePop();
         });
@@ -3629,7 +3631,7 @@
         if (!(day instanceof HTMLElement) || !day.dataset.date) return;
         if (datePopDrag.hover === day.dataset.date) return;
         datePopDrag.hover = day.dataset.date;
-        // ?�음???�는 ?�전?? 칸으�??�래그하�??�당 ?�로 뷰�? ?�겨 ?�속 ?�택???�게 ?�다
+        // 다음달(또는 이전달) 칸으로 드래그하면 해당 달로 뷰를 넘겨 연속 선택이 되게 한다
         const hoverDate = parseDateStr(day.dataset.date);
         if (
           !Number.isNaN(hoverDate.getTime()) &&
@@ -3664,7 +3666,7 @@
 
   function renderDatePop() {
     if (!datePopEl || !datePopGrid) return;
-    if (datePopTitle) datePopTitle.textContent = `${datePopYear}??${datePopMonth + 1}??;
+    if (datePopTitle) datePopTitle.textContent = `${datePopYear}년 ${datePopMonth + 1}월`;
 
     const startStr = taskStart.value || "";
     const endStr = taskEnd.value || "";
@@ -3684,7 +3686,7 @@
     /** @type {{ date: Date, muted: boolean }[]} */
     const cells = [];
 
-    // ?�전???�짜�?채워 ?�말?�월�??�래그�? ?�기지 ?�게 ?�다
+    // 이전달 날짜를 채워 월말→월초 드래그가 끊기지 않게 한다
     for (let i = 0; i < leading; i++) {
       cells.push({ date: new Date(datePopYear, datePopMonth, -leading + i + 1), muted: true });
     }
@@ -3717,7 +3719,7 @@
     });
   }
 
-  /** ?�력?�서 고른 값을 ?�력칸에 반영?�다. */
+  /** 달력에서 고른 값을 입력칸에 반영한다. */
   function applyDatePopSelection(from, to) {
     const single = !to || from === to;
     if (single) {
@@ -3761,7 +3763,8 @@
     if (!(input instanceof HTMLInputElement)) return;
     input.addEventListener("mouseenter", () => openDatePop(field));
     input.addEventListener("mouseleave", scheduleCloseDatePop);
-    // 커스?� ?�력???��?�??�이?�브 date picker??막고, ?�릭?�도 ?�업???��? ?�는??    input.addEventListener("mousedown", (e) => {
+    // 커스텀 달력을 유지: 입력칸 클릭 시 네이티브 picker만 막고 팝업은 다시 연다
+    input.addEventListener("mousedown", (e) => {
       e.preventDefault();
       datePopFocusSuppressUntil = Date.now() + 400;
       openDatePop(field);
@@ -3779,7 +3782,7 @@
     const to = anchor <= hover ? hover : anchor;
     datePopDrag = null;
     applyDatePopSelection(from, to);
-    // ?�정 ?�래그�? ?�어???????�도�??�업?� ?��?
+    // 이어서 수정 드래그할 수 있도록 팝업 유지
     renderDatePop();
   });
 
@@ -3799,13 +3802,13 @@
 
   taskStart.addEventListener("change", () => {
     if (taskStart.value && taskEnd.value && parseDateStr(taskStart.value) > parseDateStr(taskEnd.value)) {
-      openAlertDialog("?�작?�이 ?�료?�보????�� ???�습?�다.");
+      openAlertDialog("시작일이 완료일보다 늦을 수 없습니다.");
       taskEnd.value = taskStart.value;
     }
   });
   taskEnd.addEventListener("change", () => {
     if (taskStart.value && taskEnd.value && parseDateStr(taskStart.value) > parseDateStr(taskEnd.value)) {
-      openAlertDialog("?�작?�이 ?�료?�보????�� ???�습?�다.");
+      openAlertDialog("시작일이 완료일보다 늦을 수 없습니다.");
       taskEnd.value = taskStart.value;
     }
   });
@@ -3818,7 +3821,7 @@
   if (btnDeliverableAddToggle) {
     btnDeliverableAddToggle.addEventListener("click", () => {
       if (isDeliverableInputRowOpen()) {
-        // C2: ?�−???�르�??�력창을 ?�고 ?�어 ???�용??초기?�한??(?�록?��? ?�음).
+        // C2: 「−」 누르면 입력창을 닫고 적어 둔 내용도 초기화한다 (등록하지 않음).
         resetDeliverableInputRow();
         return;
       }
@@ -3835,7 +3838,7 @@
     bindDeliverableNameTextareaBehavior(deliverableNameInput);
     queueMicrotask(() => refreshDeliverableHeaderUI());
   }
-  // 모달 ???�른 곳을 ?�르�? ?�력 중이???�출물을 목록?�로 ?�동 ?�니메이?????�력창을 ?�는??
+  // 모달 안 다른 곳을 누르면: 입력 중이던 산출물을 목록으로 이동 애니메이션 후 입력창을 닫는다.
   taskModal.addEventListener("mousedown", (e) => {
     if (!isDeliverableInputRowOpen()) return;
     const target = e.target;
@@ -3974,12 +3977,12 @@
         const parsed = JSON.parse(txt);
         const incoming = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.tasks) ? parsed.tasks : null;
         if (!incoming) {
-          alert("?�정복원 ?�일 ?�식???�바르�? ?�습?�다. (tasks 배열 ?�요)");
+          alert("일정복원 파일 형식이 올바르지 않습니다. (tasks 배열 필요)");
           return;
         }
-        const ok = await openConfirmDialog("?�재 ?�정??백업 ?�일 ?�용?�로 ??��?�까??", {
-          title: "?�정복원 ?�인",
-          okLabel: "?�정복원",
+        const ok = await openConfirmDialog("현재 일정을 백업 파일 내용으로 덮어쓸까요?", {
+          title: "일정복원 확인",
+          okLabel: "일정복원",
           cancelLabel: "취소",
           showCancel: true,
         });
@@ -3988,9 +3991,9 @@
         await saveTasks();
         renderCalendar();
         updateSearchResults();
-        alert(`?�정복원 ?�료: ${tasks.length}�?);
+        alert(`일정복원 완료: ${tasks.length}건`);
       } catch (e) {
-        alert("?�정복원 ?�패: JSON ?�일???�인??주세??");
+        alert("일정복원 실패: JSON 파일을 확인해 주세요.");
       }
     });
   }
@@ -4020,7 +4023,7 @@
     ocrBackdrop.addEventListener("click", closeOcrModal);
     btnSaveGeminiKey.addEventListener("click", () => {
       saveGeminiKeyToStorage(geminiApiKeyInput.value);
-      ocrStatus.textContent = "API ?��? ??브라?��????�?�했?�니??";
+      ocrStatus.textContent = "API 키를 이 브라우저에 저장했습니다.";
     });
     ocrFileInput.addEventListener("change", () => {
       const f = ocrFileInput.files && ocrFileInput.files[0];
@@ -4059,34 +4062,34 @@
     btnOcrRun.addEventListener("click", async () => {
       const key = (geminiApiKeyInput.value || "").trim();
       if (!key) {
-        ocrStatus.textContent = "API ?��? ?�력?�거???�키 ?�?�」을 ?�러 주세??";
+        ocrStatus.textContent = "API 키를 입력하거나 「키 저장」을 눌러 주세요.";
         return;
       }
       if (!ocrPendingBase64) {
-        ocrStatus.textContent = "?��?지�?먼�? ?�택??주세??";
+        ocrStatus.textContent = "이미지를 먼저 선택해 주세요.";
         return;
       }
-      ocrStatus.textContent = "?�식 중�?;
+      ocrStatus.textContent = "인식 중…";
       btnOcrRun.disabled = true;
       try {
         ocrDraftRows = await runGeminiOcr(ocrPendingBase64, ocrPendingMime, key);
         if (!ocrDraftRows.length) {
-          ocrStatus.textContent = "?�식???�일???�습?�다. ?�른 ?�진?�로 ?�도??보세??";
+          ocrStatus.textContent = "인식된 할일이 없습니다. 다른 사진으로 시도해 보세요.";
           ocrResults.hidden = true;
           return;
         }
         renderOcrDraftList();
         ocrResults.hidden = false;
-        ocrStatus.textContent = `${ocrDraftRows.length}건을 ?�식?�습?�다. ?�정 ???�선????�� ?�력??추�??��? ?�르?�요.`;
+        ocrStatus.textContent = `${ocrDraftRows.length}건을 인식했습니다. 수정 후 「선택 항목 달력에 추가」를 누르세요.`;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         if (/api key not valid|permission|referer|denied|forbidden|401|403/i.test(msg)) {
           ocrStatus.textContent =
-            "?�류: API ??권한/?�한 문제?�니?? Google AI Studio?�서 ???�한(HTTP 리퍼??IP) ?�는 ?�로?�트 권한???�인??주세??";
+            "오류: API 키 권한/제한 문제입니다. Google AI Studio에서 키 제한(HTTP 리퍼러/IP) 또는 프로젝트 권한을 확인해 주세요.";
         } else if (/quota|rate|429/i.test(msg)) {
-          ocrStatus.textContent = "?�류: ?�용???�도(Quota) 초과?�니?? ?�시 ???�시 ?�도?�거??결제/쿼터�??�인??주세??";
+          ocrStatus.textContent = "오류: 사용량 한도(Quota) 초과입니다. 잠시 후 다시 시도하거나 결제/쿼터를 확인해 주세요.";
         } else {
-          ocrStatus.textContent = "?�류: " + msg;
+          ocrStatus.textContent = "오류: " + msg;
         }
         ocrResults.hidden = true;
       } finally {
@@ -4096,13 +4099,13 @@
     btnOcrApply.addEventListener("click", async () => {
       const payloads = readOcrDraftFromDom();
       if (!payloads.length) {
-        alert("추�?????��???�나 ?�상 ?�택??주세??");
+        alert("추가할 항목을 하나 이상 선택해 주세요.");
         return;
       }
       const newTasks = payloads.map((p) => normalizeTask({ id: uuid(), ...p }));
       const prevTasks = tasks.slice();
       try {
-        ocrStatus.textContent = "?�력???�??중�?;
+        ocrStatus.textContent = "달력에 저장 중…";
         btnOcrApply.disabled = true;
         await waitForFirebaseReady();
         tasks.push(...newTasks);
@@ -4120,15 +4123,15 @@
           }
         }
         renderCalendar();
-        ocrStatus.textContent = `?�???�료: ${newTasks.length}�?;
+        ocrStatus.textContent = `저장 완료: ${newTasks.length}건`;
         closeOcrModal();
       } catch (e) {
         tasks = prevTasks;
         renderCalendar();
         console.error("OCR apply failed:", e);
         const msg = e instanceof Error ? e.message : String(e);
-        ocrStatus.textContent = "?�???�패: " + msg;
-        alert("?�력 ?�??�??�류가 발생?�습?�다: " + msg);
+        ocrStatus.textContent = "저장 실패: " + msg;
+        alert("달력 저장 중 오류가 발생했습니다: " + msg);
       } finally {
         btnOcrApply.disabled = false;
       }
@@ -4138,7 +4141,7 @@
   searchInput.addEventListener("input", updateSearchResults);
   searchStatus.addEventListener("change", updateSearchResults);
 
-  // 모달 바깥 ?�릭 = ?�료: 변경이 ?�으�??�?�하�? ?�으�?그냥 ?�는??
+  // 모달 바깥 클릭 = 완료: 변경이 있으면 저장하고, 없으면 그냥 닫는다.
   modalBackdrop.addEventListener("click", () => {
     if (taskModal.hidden) return;
     if (isEffectivelyEmptyDraft()) {
@@ -4205,7 +4208,7 @@
     }, 60 * 1000);
   }
 
-  /** PWA: ?�비???�커 ?�록 (file:// �??�었???�는 건너?�) */
+  /** PWA: 서비스 워커 등록 (file:// 로 열었을 때는 건너뜀) */
   function registerServiceWorker() {
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "http:" && location.protocol !== "https:") return;
@@ -4220,7 +4223,7 @@
           console.error("Service worker registration failed:", err);
         });
       navigator.serviceWorker.addEventListener("controllerchange", () => {
-        // new SW took control ??reload once so calendar layout code is fresh
+        // new SW took control — reload once so calendar layout code is fresh
         if (sessionStorage.getItem("sw-reloaded-v12")) return;
         sessionStorage.setItem("sw-reloaded-v12", "1");
         location.reload();

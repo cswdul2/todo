@@ -638,13 +638,7 @@ body.calendar-dragging {
   opacity: 0.45;
 }
 
-/* 오늘(연체 아님): 은은한 강조 — 두꺼운 사각 링은 쓰지 않음 */
-.calendar-cell--today:not(.calendar-cell--overdue) {
-  border-color: #5b8fd9;
-  box-shadow:
-    0 6px 16px rgba(59, 130, 246, 0.18),
-    0 2px 0 rgba(255, 255, 255, 0.85) inset;
-}
+/* 오늘 강조는 .calendar-cell--today .calendar-cell__num 숫자 스타일만 사용 (사각 테두리 없음) */
 
 .calendar-cell--today .calendar-cell__num,
 .calendar-cell--today .calendar-cell__dots {
@@ -704,22 +698,7 @@ body.calendar-dragging {
   background: var(--surface);
 }
 
-/* 오늘 + heat: 외곽 링 (연체가 아닐 때만 파란 테두리는 위 .calendar-cell--today:not(.overdue)에서 처리) */
-.calendar-cell--today.calendar-cell--heat-low:not(.calendar-cell--overdue),
-.calendar-cell--today.calendar-cell--heat-mid:not(.calendar-cell--overdue),
-.calendar-cell--today.calendar-cell--heat-high:not(.calendar-cell--overdue),
-.calendar-cell--today.calendar-cell--heat-critical:not(.calendar-cell--overdue) {
-  box-shadow:
-    0 6px 16px rgba(59, 130, 246, 0.16),
-    0 2px 0 rgba(255, 255, 255, 0.85) inset;
-}
-
-/* 오늘이면서 연체: 은은한 파란 그림자 + 적색 점선은 overdue 규칙 유지 */
-.calendar-cell--today.calendar-cell--overdue {
-  box-shadow:
-    0 6px 16px rgba(59, 130, 246, 0.14),
-    0 2px 0 rgba(255, 255, 255, 0.85) inset;
-}
+/* 오늘 + heat/연체: 사각 링 추가하지 않음 (heat·overdue 자체 스타일만) */
 
 .calendar-cell--overdue.calendar-cell--heat-low:hover:not(:disabled) {
   background: #dbeafe;
