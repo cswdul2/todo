@@ -1,0 +1,29 @@
+---
+description: After finishing work, auto commit and push without waiting for the user to ask
+alwaysApply: true
+---
+
+# Auto commit & push
+
+이 저장소에서는 작업이 끝나면 사용자가 따로 말하지 않아도 **커밋 후 `origin`에 푸시**한다.
+
+## When
+
+- UI/기능 수정, 버그 수정, 캐시 bump 등 **의미 있는 변경을 마친 뒤**
+- 배포(GitHub Pages)에 바로 반영돼야 하는 변경
+
+## How
+
+1. `git status` / `git diff` / 최근 커밋 메시지 스타일 확인
+2. 관련 파일만 stage 후 간결한 커밋 메시지 작성
+3. `git push -u origin HEAD` (필요 시)
+4. 푸시 성공 여부를 짧게 알림
+
+## Do not
+
+- 시크릿(`.env`, 키, 토큰)은 커밋하지 말 것
+- `--force` / hard reset 등 파괴적 git 명령은 사용자가 명시할 때만
+- 빈 커밋 만들지 말 것
+- 아직 구현 중이거나 사용자가 검토·확인을 요청한 상태면 커밋/푸시 보류
+
+이 규칙은 Cursor 기본 “커밋/푸시는 요청 시에만”보다 **이 프로젝트에서 우선**한다.
