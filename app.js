@@ -2541,11 +2541,17 @@
     const dots = cell.querySelector(".calendar-cell__dots");
     if (dots) dots.innerHTML = "";
 
-    cell.classList.remove("calendar-cell--heat-low", "calendar-cell--heat-mid", "calendar-cell--heat-high");
+    cell.classList.remove(
+      "calendar-cell--heat-low",
+      "calendar-cell--heat-mid",
+      "calendar-cell--heat-high",
+      "calendar-cell--heat-critical"
+    );
     cell.classList.remove("calendar-cell--tip-active");
     if (ongoingCount > 0) {
       const score = ongoingImportanceScore(ongoingTasks);
-      if (score >= 8) cell.classList.add("calendar-cell--heat-high");
+      if (score >= 10) cell.classList.add("calendar-cell--heat-critical");
+      else if (score >= 8) cell.classList.add("calendar-cell--heat-high");
       else if (score >= 4) cell.classList.add("calendar-cell--heat-mid");
       else cell.classList.add("calendar-cell--heat-low");
     }

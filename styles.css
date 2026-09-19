@@ -368,6 +368,42 @@ body {
   border-top: 1px dashed var(--border);
 }
 
+.dot-legend__heading--tip {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  cursor: help;
+  border-bottom: 1px dotted #94a3b8;
+}
+
+.dot-legend__tip {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  z-index: 40;
+  display: none;
+  width: max-content;
+  max-width: min(18rem, 70vw);
+  padding: 0.4rem 0.55rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #0f172a;
+  color: #f8fafc;
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1.4;
+  text-transform: none;
+  letter-spacing: 0;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.22);
+  pointer-events: none;
+}
+
+.dot-legend__heading--tip:hover .dot-legend__tip,
+.dot-legend__heading--tip:focus .dot-legend__tip,
+.dot-legend__heading--tip:focus-visible .dot-legend__tip {
+  display: block;
+}
+
 .dot-legend__row {
   display: flex;
   flex-wrap: wrap;
@@ -409,6 +445,11 @@ body {
 .heat-swatch--high {
   background: #ffedd5;
   border: 1px solid #fb923c;
+}
+
+.heat-swatch--critical {
+  background: #fecaca;
+  border: 1px solid #f87171;
 }
 
 /* 중요도 범례: 채움 없이 테두리 원만, 크기로 구분 */
@@ -614,7 +655,7 @@ body.calendar-dragging {
   z-index: 1;
 }
 
-/* on-going 중요도 합산: 8점↑ 주황, 4~7 연노랑, 3↓ 연하늘 (배경은 heat 클래스가 우선) */
+/* 당일 업무강도(중요도 합산): 10↑ 빨강, 8~9 주황, 4~7 연노랑, 3↓ 연하늘 */
 .calendar-cell--heat-low {
   background: #e0f2fe;
   border-color: #93c5fd;
@@ -645,19 +686,32 @@ body.calendar-dragging {
   border-color: #f97316;
 }
 
+.calendar-cell--heat-critical {
+  background: #fecaca;
+  border-color: #f87171;
+}
+
+.calendar-cell--heat-critical:hover:not(:disabled) {
+  background: #fca5a5;
+  border-color: #ef4444;
+}
+
 /* 지연업무(기한 지난 미완료): 2px 적색 점선 테두리 */
 .calendar-cell--overdue {
   border: 2px dashed #dc2626;
 }
 
-.calendar-cell--overdue:not(.calendar-cell--heat-low):not(.calendar-cell--heat-mid):not(.calendar-cell--heat-high) {
+.calendar-cell--overdue:not(.calendar-cell--heat-low):not(.calendar-cell--heat-mid):not(.calendar-cell--heat-high):not(
+    .calendar-cell--heat-critical
+  ) {
   background: var(--surface);
 }
 
 /* 오늘 + heat: 외곽 링 (연체가 아닐 때만 파란 테두리는 위 .calendar-cell--today:not(.overdue)에서 처리) */
 .calendar-cell--today.calendar-cell--heat-low:not(.calendar-cell--overdue),
 .calendar-cell--today.calendar-cell--heat-mid:not(.calendar-cell--overdue),
-.calendar-cell--today.calendar-cell--heat-high:not(.calendar-cell--overdue) {
+.calendar-cell--today.calendar-cell--heat-high:not(.calendar-cell--overdue),
+.calendar-cell--today.calendar-cell--heat-critical:not(.calendar-cell--overdue) {
   box-shadow:
     0 0 0 2px rgba(74, 127, 212, 0.52),
     0 14px 28px rgba(15, 23, 42, 0.34),
@@ -691,9 +745,14 @@ body.calendar-dragging {
   border: 2px dashed #b91c1c;
 }
 
-.calendar-cell--overdue:not(.calendar-cell--heat-low):not(.calendar-cell--heat-mid):not(.calendar-cell--heat-high):hover:not(
-    :disabled
-  ) {
+.calendar-cell--overdue.calendar-cell--heat-critical:hover:not(:disabled) {
+  background: #fca5a5;
+  border: 2px dashed #b91c1c;
+}
+
+.calendar-cell--overdue:not(.calendar-cell--heat-low):not(.calendar-cell--heat-mid):not(.calendar-cell--heat-high):not(
+    .calendar-cell--heat-critical
+  ):hover:not(:disabled) {
   background: var(--surface-hover);
   border: 2px dashed #b91c1c;
 }
@@ -734,7 +793,9 @@ body.calendar-dragging {
   color: var(--sat);
 }
 
-.calendar-cell--overdue:not(.calendar-cell--heat-low):not(.calendar-cell--heat-mid):not(.calendar-cell--heat-high)
+.calendar-cell--overdue:not(.calendar-cell--heat-low):not(.calendar-cell--heat-mid):not(.calendar-cell--heat-high):not(
+    .calendar-cell--heat-critical
+  )
   .calendar-cell__num {
   color: #991b1b;
 }
