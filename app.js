@@ -134,6 +134,8 @@
   let draftImportance = "medium";
   /** 산출물 입력행에서 등급을 직접 고른 적이 있는지 (고르기 전에는 회색 박스) */
   let deliverableHeadImpPicked = false;
+  /** 산출물 등록 애니메이션 진행 중이면 중복 등록을 막는다 */
+  let deliverableCommitBusy = false;
   /** @type {string | null} */
   let ocrPendingBase64 = null;
   /** @type {string} */
@@ -822,6 +824,7 @@
     deliverableEditorHead.hidden = !open;
     if (btnDeliverableAddToggle instanceof HTMLElement) {
       btnDeliverableAddToggle.setAttribute("aria-expanded", open ? "true" : "false");
+      btnDeliverableAddToggle.textContent = open ? "➖" : "➕";
       const label = open ? "산출물 입력칸 닫기" : "산출물 입력칸 열기";
       btnDeliverableAddToggle.setAttribute("aria-label", label);
       btnDeliverableAddToggle.title = label;
@@ -837,26 +840,101 @@
     if (deliverableImportanceInput) deliverableImportanceInput.value = "high";
     deliverableHeadImpPicked = false;
     setDeliverableInputRowOpen(false);
+    refreshDeliverableHeaderUI();
+  }
+
+  /**
+   * 입력행 → 목록으로 내려가는 이동 애니메이션.
+   * @param {HTMLElement} fromEl
+   * @param {HTMLElement} toEl
+   * @param {{ name: string, importance: string }} payload
+   */
+  function playDeliverableDropAnimation(fromEl, toEl, payload) {
+    if (!(fromEl instanceof HTMLElement) || !(toEl instanceof HTMLElement)) return Promise.resolve();
+    const from = fromEl.getBoundingClientRect();
+    const to = toEl.getBoundingClientRect();
+    if (from.width < 2 || to.width < 2) return Promise.resolve();
+
+    const ghost = document.createElement("div");
+    ghost.className =
+      "deliverable-fly" +
+      (payload.importance === "high"
+        ? " deliverable-imp-band--high"
+        : payload.importance === "low"
+          ? " deliverable-imp-band--low"
+          : " deliverable-imp-band--medium");
+    ghost.textContent = payload.name;
+    ghost.style.left = `${from.left}px`;
+    ghost.style.top = `${from.top}px`;
+    ghost.style.width = `${from.width}px`;
+    ghost.style.height = `${from.height}px`;
+    document.body.appendChild(ghost);
+    toEl.classList.add("deliverable-item--enter-target");
+
+    return new Promise((resolve) => {
+      requestAnimationFrame(() => {
+        ghost.style.transform = `translate(${to.left - from.left}px, ${to.top - from.top}px) scale(0.98)`;
+        ghost.style.width = `${to.width}px`;
+        ghost.style.height = `${to.height}px`;
+        ghost.style.opacity = "0.35";
+      });
+      const finish = () => {
+        ghost.remove();
+        toEl.classList.remove("deliverable-item--enter-target");
+        toEl.classList.add("deliverable-item--just-added");
+        window.setTimeout(() => toEl.classList.remove("deliverable-item--just-added"), 420);
+        resolve();
+      };
+      ghost.addEventListener("transitionend", finish, { once: true });
+      window.setTimeout(finish, 380);
+    });
   }
 
   /**
    * 입력행의 내용을 산출물 목록에 추가한다.
-   * @param {{ keepFocus?: boolean }} opts
+   * @param {{ keepFocus?: boolean, closeAfter?: boolean }} opts
    */
   function commitDeliverableFromInputRow(opts = {}) {
+    if (deliverableCommitBusy) return false;
     if (!deliverableNameInput || !deliverableImportanceInput) return false;
     const name = deliverableNameInput.value.trim();
-    if (!name) return false;
+    if (!name) {
+      if (opts.closeAfter) resetDeliverableInputRow();
+      return false;
+    }
     const importanceRaw = deliverableImportanceInput.value;
     const importance = importanceRaw === "high" || importanceRaw === "low" ? importanceRaw : "medium";
+    const newId = uuid();
+    const fromEl = deliverableEditorHead;
     const current = collectDeliverablesFromModal();
-    current.push({ id: uuid(), name, importance, done: false, createdAt: Date.now() });
+    current.push({ id: newId, name, importance, done: false, createdAt: Date.now() });
+    deliverableCommitBusy = true;
     renderDeliverableList(current);
+    const toEl = deliverableList
+      ? /** @type {HTMLElement | null} */ (deliverableList.querySelector(`.deliverable-item[data-id="${newId}"]`))
+      : null;
+
     deliverableNameInput.value = "";
     deliverableHeadImpPicked = false;
-    if (opts.keepFocus) deliverableNameInput.focus();
     refreshDeliverableHeaderUI();
     updateActualEffortPreview();
+
+    const afterAnim = () => {
+      deliverableCommitBusy = false;
+      if (opts.closeAfter) {
+        resetDeliverableInputRow();
+        return;
+      }
+      if (opts.keepFocus && deliverableNameInput instanceof HTMLTextAreaElement) {
+        setDeliverableInputRowOpen(true, { focus: true });
+      }
+    };
+
+    if (fromEl instanceof HTMLElement && toEl instanceof HTMLElement) {
+      void playDeliverableDropAnimation(fromEl, toEl, { name, importance }).then(afterAnim);
+    } else {
+      afterAnim();
+    }
     return true;
   }
 
@@ -1657,7 +1735,7 @@
     layer.querySelectorAll(".calendar-range-line").forEach((el) => el.remove());
     const gridRect = calendarGrid.getBoundingClientRect();
     if (gridRect.width < 1 || gridRect.height < 1) return;
-    const BAR_HEIGHT = 6;
+    const BAR_HEIGHT = 8;
     const BAR_GAP = 4;
     const LINE_STEP = BAR_HEIGHT + BAR_GAP;
     const HEADER_BASE_PX = 24; // 날짜/공휴일/배지 아래 최소 시작 높이
@@ -1970,8 +2048,8 @@
     cellLaneMap = new Map(),
     rowOverflowPx = {},
     rowBaseTop = {},
-    lineStep = 10,
-    barHeight = 6
+    lineStep = 12,
+    barHeight = 8
   ) {
     if (!calendarGrid) return;
     const cells = [...calendarGrid.querySelectorAll(".calendar-cell[data-date-str]")];
@@ -3631,10 +3709,8 @@
   if (btnDeliverableAddToggle) {
     btnDeliverableAddToggle.addEventListener("click", () => {
       if (isDeliverableInputRowOpen()) {
-        // 입력한 내용이 있으면 먼저 목록에 추가하고, 비어 있으면 입력칸을 닫는다.
-        const pending = deliverableNameInput ? deliverableNameInput.value.trim() : "";
-        if (pending) commitDeliverableFromInputRow({ keepFocus: true });
-        else setDeliverableInputRowOpen(false);
+        // C2: 「−」 누르면 입력창을 닫고 적어 둔 내용도 초기화한다 (등록하지 않음).
+        resetDeliverableInputRow();
         return;
       }
       setDeliverableInputRowOpen(true, { focus: true });
@@ -3648,20 +3724,16 @@
   }
   if (deliverableNameInput instanceof HTMLTextAreaElement) {
     bindDeliverableNameTextareaBehavior(deliverableNameInput);
-    // 입력칸을 벗어나면(다른 곳 클릭·모달 이탈) 입력한 산출물을 목록에 반영한다.
-    deliverableNameInput.addEventListener("blur", () => {
-      commitDeliverableFromInputRow();
-    });
     queueMicrotask(() => refreshDeliverableHeaderUI());
   }
-  // 모달 안 다른 곳을 눌러도 입력 중이던 산출물을 반영한다.
+  // 모달 안 다른 곳을 누르면: 입력 중이던 산출물을 목록으로 이동 애니메이션 후 입력창을 닫는다.
   taskModal.addEventListener("mousedown", (e) => {
     if (!isDeliverableInputRowOpen()) return;
     const target = e.target;
     if (!(target instanceof HTMLElement)) return;
     if (deliverableEditor instanceof HTMLElement && deliverableEditor.contains(target)) return;
     if (btnDeliverableAddToggle instanceof HTMLElement && btnDeliverableAddToggle.contains(target)) return;
-    commitDeliverableFromInputRow();
+    commitDeliverableFromInputRow({ closeAfter: true });
   });
   if (deliverableList) {
     deliverableList.addEventListener("click", (e) => {
