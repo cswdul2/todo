@@ -801,30 +801,29 @@ body.calendar-dragging {
 }
 
 .calendar-cell__dots {
-  margin-top: 6px;
+  margin-top: auto;
   position: relative;
-  z-index: 40;
+  z-index: 2;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 3px;
   max-width: 100%;
-  padding-top: 2px;
+  padding-top: 4px;
   background: inherit;
   overflow: visible;
   flex: 0 0 auto;
 }
 
-/* Reserve vertical room for range stack bars so dots do not overlap */
+/* JS가 --range-stack-px 로 실제 바 스택 하단까지 높이를 맞춘다 */
 .calendar-cell__range-spacer {
   display: block;
   flex: 0 0 auto;
   align-self: stretch;
   width: 100%;
-  /* BAR_HEIGHT 8 + BAR_GAP 4 = LINE_STEP 12 */
-  height: calc(var(--range-lanes, 0) * 12px);
+  height: var(--range-stack-px, calc(var(--range-lanes, 0) * 12px));
   min-height: 0;
-  margin-top: 6px;
+  margin-top: 4px;
   pointer-events: none;
 }
 

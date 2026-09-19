@@ -1956,9 +1956,23 @@
     allCells.forEach((cell, idx) => {
       const ds = cell.dataset.dateStr || "";
       const lanes = cellLaneMap.get(ds) || 0;
-      cell.style.setProperty("--range-lanes", String(lanes));
       const row = Math.floor(idx / 7);
       rowLaneMax[row] = Math.max(rowLaneMax[row] || 0, lanes);
+      cell.style.setProperty("--range-lanes", String(lanes));
+
+      // 절대좌표 바 하단까지 spacer를 픽셀로 확보 → 동그라미가 바 아래로 내려가게 한다.
+      const spacerEl = /** @type {HTMLElement | null} */ (cell.querySelector(".calendar-cell__range-spacer"));
+      const numEl = /** @type {HTMLElement | null} */ (cell.querySelector(".calendar-cell__num"));
+      const numBottom = numEl ? numEl.offsetTop + numEl.offsetHeight : 0;
+      const spacerStart = numBottom + 4; // .calendar-cell__range-spacer margin-top
+      const stackPx = lanes > 0 ? BAR_HEIGHT + (lanes - 1) * LINE_STEP : 0;
+      const rowBase = rowBaseTop[row] || HEADER_BASE_PX;
+      const barBottomRel = dateBarBottomAbsMap.has(ds)
+        ? dateBarBottomAbsMap.get(ds) - cell.offsetTop
+        : rowBase + stackPx;
+      const needSpacer = Math.max(stackPx, Math.ceil(barBottomRel + 12 - spacerStart));
+      cell.style.setProperty("--range-stack-px", `${Math.max(0, needSpacer)}px`);
+      if (spacerEl) spacerEl.style.height = `${Math.max(0, needSpacer)}px`;
     });
     if (!finalPass) {
       /** @type {Record<number, number>} */
@@ -1970,14 +1984,11 @@
         if (barBottomAbs == null) return;
         const row = Math.floor(idx / 7);
         const dotsEl = /** @type {HTMLElement | null} */ (cell.querySelector(".calendar-cell__dots"));
-        // 근본식:
-        // [마지막 바 하단 + 3px] <= [동그라미 시작]
-        // 동그라미 시작은 셀 높이와 함께 이동하므로, 현재 셀에서
-        // bottomReserve = (cellHeight - dotsTop) 를 추출해 필요한 최소 높이를 역산한다.
+        // [마지막 바 하단 + 12px] <= [동그라미 시작]
         const dotsTop = dotsEl ? dotsEl.offsetTop : cell.offsetHeight;
         const bottomReserve = Math.max(0, cell.offsetHeight - dotsTop);
         const barBottomRel = barBottomAbs - cell.offsetTop;
-        const requiredHeight = barBottomRel + 10 + bottomReserve;
+        const requiredHeight = barBottomRel + 12 + bottomReserve;
         const overflow = Math.ceil(requiredHeight - cell.offsetHeight);
         if (overflow > 0) rowOverflowPx[row] = Math.max(rowOverflowPx[row] || 0, overflow);
       });
@@ -1986,14 +1997,16 @@
       requestAnimationFrame(() => renderMultiDayRangeLines(true));
       return;
     }
-    // final pass에서도 실제 DOM 좌표 기준으로
-    // [마지막 바 하단 + 3px <= 동그라미 시작] 불변식을 검사/보정한다.
+    // final pass: 실제 DOM에서 바·점 겹침이 남으면 spacer+행높이를 같이 키운다.
     if (barDotLayoutFixAttempts < 20) {
       /** @type {Record<number, number>} */
       const overlapByRow = {};
+      /** @type {Map<string, number>} */
+      const spacerBoostByDate = new Map();
       const lines = [...layer.querySelectorAll(".calendar-range-line")];
       allCells.forEach((cell, idx) => {
         const row = Math.floor(idx / 7);
+        const ds = cell.dataset.dateStr || "";
         const dotsEl = /** @type {HTMLElement | null} */ (cell.querySelector(".calendar-cell__dots"));
         if (!dotsEl) return;
         const dotsTop = dotsEl.offsetTop;
@@ -2007,18 +2020,29 @@
           const lineBottom = line.offsetTop + BAR_HEIGHT;
           const lineLeft = line.offsetLeft;
           const lineRight = line.offsetLeft + line.offsetWidth;
-          // 같은 행(세로 교차) + 같은 날짜 칸(x 교차)인 라인만 검사
           if (lineBottom <= cellTop || lineTop >= cellBottom) return;
           if (lineRight <= cellLeft || lineLeft >= cellRight) return;
           const relBottom = lineBottom - cellTop;
           if (relBottom > maxBottomInCell) maxBottomInCell = relBottom;
         });
         if (!Number.isFinite(maxBottomInCell)) return;
-        const overlap = Math.ceil(maxBottomInCell + 10 - dotsTop);
-        if (overlap > 0) overlapByRow[row] = Math.max(overlapByRow[row] || 0, overlap);
+        const overlap = Math.ceil(maxBottomInCell + 12 - dotsTop);
+        if (overlap > 0) {
+          overlapByRow[row] = Math.max(overlapByRow[row] || 0, overlap);
+          if (ds) spacerBoostByDate.set(ds, Math.max(spacerBoostByDate.get(ds) || 0, overlap));
+        }
       });
 
       if (Object.keys(overlapByRow).length > 0) {
+        spacerBoostByDate.forEach((boost, ds) => {
+          const cell = cellByDate.get(ds);
+          if (!cell) return;
+          const spacerEl = /** @type {HTMLElement | null} */ (cell.querySelector(".calendar-cell__range-spacer"));
+          const cur = parseFloat(cell.style.getPropertyValue("--range-stack-px")) || 0;
+          const next = cur + boost + 8;
+          cell.style.setProperty("--range-stack-px", `${next}px`);
+          if (spacerEl) spacerEl.style.height = `${next}px`;
+        });
         const currentRows = getComputedStyle(calendarGrid).gridTemplateRows
           .split(" ")
           .map((x) => parseFloat(x) || 0);
@@ -2026,7 +2050,6 @@
         const nextRows = [];
         for (let row = 0; row < rowCount; row++) {
           const base = currentRows[row] || 0;
-          // 드래그 후 바가 몰린 케이스에서 재침범을 막기 위해 버퍼를 크게 준다.
           nextRows.push(`${base + (overlapByRow[row] || 0) + 28}px`);
         }
         calendarGrid.style.gridTemplateRows = nextRows.join(" ");
@@ -2081,21 +2104,22 @@
         const lanes = cellLaneMap.get(ds) || 0;
         const laneStackHeight = lanes > 0 ? barHeight + (lanes - 1) * lineStep : 0;
         const dotsEl = /** @type {HTMLElement | null} */ (cell.querySelector(".calendar-cell__dots"));
+        const spacerEl = /** @type {HTMLElement | null} */ (cell.querySelector(".calendar-cell__range-spacer"));
         const dotsHeight = dotsEl ? Math.max(0, dotsEl.offsetHeight) : 0;
         if (dotsHeight > maxDotsHeight) maxDotsHeight = dotsHeight;
         const headerGap = 7;
+        const spacerH = spacerEl ? Math.max(0, spacerEl.offsetHeight) : laneStackHeight;
         // 날짜별 dot 개수(1줄/2줄/3줄)에 따라 실제 하단 보호 높이를 반영한다.
         const dotSafe = Math.max(24, dotsHeight + 18);
-        const cellRequired = contentBottom + headerGap + laneStackHeight + dotSafe;
+        const cellRequired = contentBottom + headerGap + Math.max(laneStackHeight, spacerH) + dotSafe;
         if (cellRequired > rowRequiredHeight) rowRequiredHeight = cellRequired;
       });
       const lanes = Math.max(rowSlots[row] || 0, rowLaneMax[row] || 0);
       const rowBase = rowBaseTop[row] || 0;
       const laneStackBottom = rowBase + (lanes > 0 ? (lanes - 1) * lineStep + barHeight : 0);
       const dotsBlock = Math.max(20, maxDotsHeight);
-      // 동그라미는 "마지막 수평바 하단 + 3px" 아래에서 시작해야 한다.
-      // flex 레이아웃/패딩/브라우저 렌더 오차를 감안해 하단 여유를 넉넉히 확보한다.
-      const strictRowHeight = laneStackBottom + 10 + dotsBlock + 56;
+      // 동그라미는 "마지막 수평바 하단 + 여유" 아래에서 시작해야 한다.
+      const strictRowHeight = laneStackBottom + 14 + dotsBlock + 56;
       const taskExtra = Math.max(0, maxTasks - 4) * 6;
       const h = Math.max(108, 92 + taskExtra, strictRowHeight, rowRequiredHeight) + (rowOverflowPx[row] || 0);
       rows.push(`${h}px`);
