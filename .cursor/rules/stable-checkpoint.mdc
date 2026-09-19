@@ -1,0 +1,20 @@
+---
+description: Known-good restore checkpoint when new work breaks existing features
+alwaysApply: true
+---
+
+# Stable checkpoint
+
+사용자가 “망가진 기능 복구 / 여기로 돌아가기”를 말하면 아래 지점으로 되돌린다.
+
+- **Tag:** `checkpoint/2026-09-20-stable`
+- **Commit:** `2755a619c68cc410692258dd64a766ddcfe6db59`
+- **포함:** 범례 왼쪽·삭제형 검정 폰트, 당일 업무강도 hover, done 초록 fill, 실적MH 산출물 중요도, 날짜 재드래그, PWA v13
+
+## Restore
+
+1. 현재 작업을 커밋하거나 stash할지 확인
+2. `git switch -c restore/<reason> checkpoint/2026-09-20-stable` 또는 요청 시 main을 해당 태그로 맞춤
+3. 복원 후 캐시 bump가 필요하면 수행하고 푸시
+
+새 기능을 넣다 기존이 깨지면 **이 체크포인트에서 다시 분기**하는 것이 기본 전략이다.
