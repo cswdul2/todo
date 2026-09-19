@@ -1735,30 +1735,32 @@
     layer.querySelectorAll(".calendar-range-line").forEach((el) => el.remove());
     const gridRect = calendarGrid.getBoundingClientRect();
     if (gridRect.width < 1 || gridRect.height < 1) return;
+
     const BAR_HEIGHT = 8;
     const BAR_GAP = 4;
     const LINE_STEP = BAR_HEIGHT + BAR_GAP;
-    const HEADER_BASE_PX = 24; // 날짜/공휴일/배지 아래 최소 시작 높이
-    const HEADER_EXTRA_PX = 6; // 날짜/배지와 수평바 간 최소 간격
+    const HEADER_BASE_PX = 24;
+    const HEADER_EXTRA_PX = 6;
+    const DOT_GAP_PX = 16;
+    const SPACER_MARGIN_TOP = 4;
+    const SPACER_MARGIN_BOTTOM = 10;
+    const DOTS_FLOOR_PX = 30;
+
     /** @type {Record<number, number>} */
     const rowSlots = {};
-    /** @type {Map<number, Map<string, Set<number>>>} row별 날짜별 lane 점유 */
+    /** @type {Map<number, Map<string, Set<number>>>} */
     const rowDayLaneUsage = new Map();
-    /** @type {Map<string, number>} 날짜별 실제 점유 라인 수 */
+    /** @type {Map<string, number>} */
     const cellLaneMap = new Map();
-    /** @type {Map<string, number>} 날짜별 실제 그려진 바의 최대 하단 절대좌표 */
-    const dateBarBottomAbsMap = new Map();
-    /** @type {Record<number, number>} row별 공통 바 시작 오프셋 */
+    /** @type {Record<number, number>} */
     const rowBaseTop = {};
+    /** @type {Record<number, number>} */
+    const rowLaneMax = {};
 
     const allCells = [...calendarGrid.querySelectorAll(".calendar-cell[data-date-str]")];
     const cellByDate = new Map(allCells.map((cell) => [cell.dataset.dateStr || "", cell]));
     if (!finalPass) barDotLayoutFixAttempts = 0;
 
-    /**
-     * 해당 셀에서 날짜 텍스트/공수 배지 하단을 피하도록 바 기준 Y 오프셋 계산
-     * @param {HTMLElement} cell
-     */
     const headerClearance = (cell) => {
       const numEl = /** @type {HTMLElement | null} */ (cell.querySelector(".calendar-cell__num"));
       const holidayEl = /** @type {HTMLElement | null} */ (cell.querySelector(".calendar-cell__holiday-name"));
@@ -1766,47 +1768,32 @@
       const numBottom = numEl ? numEl.offsetTop + numEl.offsetHeight : 0;
       const holidayBottom = holidayEl ? holidayEl.offsetTop + holidayEl.offsetHeight : 0;
       const badgeBottom = badgeEl && !badgeEl.hidden ? badgeEl.offsetTop + badgeEl.offsetHeight : 0;
-      const contentBottom = Math.max(numBottom, holidayBottom, badgeBottom);
-      // 셀 높이에 비례해 시작점을 내리면(예: cellHeight * 0.32),
-      // 행이 커질수록 바도 같이 아래로 밀려 dot 영역 침범이 반복된다.
-      // 따라서 시작점은 "헤더 콘텐츠 하단 + 여유"를 기준으로만 잡는다.
-      return Math.max(HEADER_BASE_PX, contentBottom + HEADER_EXTRA_PX);
+      return Math.max(HEADER_BASE_PX, Math.max(numBottom, holidayBottom, badgeBottom) + HEADER_EXTRA_PX);
     };
 
     allCells.forEach((cell, idx) => {
       const row = Math.floor(idx / 7);
-      const clr = headerClearance(cell);
-      rowBaseTop[row] = Math.max(rowBaseTop[row] || 0, clr);
+      rowBaseTop[row] = Math.max(rowBaseTop[row] || 0, headerClearance(cell));
     });
 
-    // 멀티데이 일정은 가로로 이어서 표시
+    /** @type {{ kind: "multi" | "single", task: any, dateRun?: string[], ds?: string, row: number, lane: number }[]} */
+    const paintList = [];
+
+    // --- Phase 1: lane packing only (no DOM bars yet) ---
     tasks.forEach((task) => {
       forEachMultiDaySegment(task, (startStr, endStr) => {
         const segments = getSegmentsInGrid(startStr, endStr, calendarGrid);
         segments.forEach((dateRun) => {
-          const firstDs = dateRun[0];
-          const lastDs = dateRun[dateRun.length - 1];
-          const firstCell = cellByDate.get(firstDs);
-          const lastCell = cellByDate.get(lastDs);
-          if (!firstCell || !lastCell) return;
-          const idx = allCells.indexOf(firstCell);
-          const row = Math.floor(idx / 7);
+          const firstCell = cellByDate.get(dateRun[0]);
+          if (!firstCell) return;
+          const row = Math.floor(allCells.indexOf(firstCell) / 7);
           let dayUsage = rowDayLaneUsage.get(row);
           if (!dayUsage) {
             dayUsage = new Map();
             rowDayLaneUsage.set(row, dayUsage);
           }
-
           let lane = 0;
-          while (true) {
-            const occupied = dateRun.some((ds) => {
-              const used = dayUsage.get(ds);
-              return !!used && used.has(lane);
-            });
-            if (!occupied) break;
-            lane += 1;
-          }
-
+          while (dateRun.some((ds) => dayUsage.get(ds)?.has(lane))) lane += 1;
           dateRun.forEach((ds) => {
             let used = dayUsage.get(ds);
             if (!used) {
@@ -1814,75 +1801,14 @@
               dayUsage.set(ds, used);
             }
             used.add(lane);
-            const prev = cellLaneMap.get(ds) || 0;
-            if (lane + 1 > prev) cellLaneMap.set(ds, lane + 1);
+            cellLaneMap.set(ds, Math.max(cellLaneMap.get(ds) || 0, lane + 1));
           });
           rowSlots[row] = Math.max(rowSlots[row] || 0, lane + 1);
-
-          const r1 = {
-            left: firstCell.offsetLeft,
-            top: firstCell.offsetTop,
-            right: firstCell.offsetLeft + firstCell.offsetWidth,
-            width: firstCell.offsetWidth,
-            height: firstCell.offsetHeight,
-          };
-          const r2 = {
-            left: lastCell.offsetLeft,
-            top: lastCell.offsetTop,
-            right: lastCell.offsetLeft + lastCell.offsetWidth,
-            width: lastCell.offsetWidth,
-            height: lastCell.offsetHeight,
-          };
-          const impKey = task.importance === "high" ? "high" : task.importance === "low" ? "low" : "medium";
-          const impToken = "■ ";
-          const stKey = task.status === "on-going" ? "ongoing" : task.status === "done" ? "done" : "ready";
-          const rowBase = rowBaseTop[row] || HEADER_BASE_PX;
-          const lineTop = Math.round(r1.top + rowBase + lane * LINE_STEP);
-          const line = document.createElement("div");
-          line.className = "calendar-range-line";
-          line.style.background = rangeLineColorForTask(task, endStr);
-          line.dataset.tipToken = impToken;
-          line.dataset.tipBody = `${taskLabel(task)}`;
-          line.classList.add(`calendar-range-line--tip-${stKey}`, `calendar-range-line--tip-imp-${impKey}`);
-          line.tabIndex = 0;
-          const updateTipAnchorPos = (e) => {
-            if (!(e instanceof MouseEvent)) return;
-            const rr = line.getBoundingClientRect();
-            const x = Math.max(0, Math.min(rr.width, e.clientX - rr.left));
-            const y = Math.max(0, Math.min(rr.height, e.clientY - rr.top));
-            line.style.setProperty("--tip-x", `${Math.round(x)}px`);
-            line.style.setProperty("--tip-y", `${Math.round(y)}px`);
-          };
-          line.addEventListener("mouseenter", updateTipAnchorPos);
-          line.addEventListener("mousemove", updateTipAnchorPos);
-          const openFromLine = () => openModal(firstDs, task.id);
-          bindRangeDrag(line, task, firstDs);
-          line.addEventListener("click", (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (suppressRangeClickTaskId === task.id && Date.now() <= suppressRangeClickUntil) return;
-            openFromLine();
-          });
-          line.addEventListener("keydown", (e) => {
-            if (e.key !== "Enter" && e.key !== " ") return;
-            e.preventDefault();
-            e.stopPropagation();
-            openFromLine();
-          });
-          line.style.left = Math.round(r1.left) + "px";
-          line.style.top = lineTop + "px";
-          line.style.width = r2.right - r1.left + "px";
-          layer.appendChild(line);
-          const lineBottomAbs = lineTop + BAR_HEIGHT;
-          dateRun.forEach((ds) => {
-            const prevBottom = dateBarBottomAbsMap.get(ds) || -Infinity;
-            if (lineBottomAbs > prevBottom) dateBarBottomAbsMap.set(ds, lineBottomAbs);
-          });
+          paintList.push({ kind: "multi", task, dateRun, row, lane, endStr });
         });
       });
     });
 
-    // 당일 일정(occurrence가 하루짜리)도 같은 트랙 아래로 순차 배치
     allCells.forEach((cell, idx) => {
       const ds = cell.dataset.dateStr || "";
       if (!ds) return;
@@ -1892,222 +1818,206 @@
         const occ = getOccurrenceContaining(t, ds);
         return !!occ && occ.start === ds && occ.end === ds;
       });
-      if (!singleDay.length) return;
-
-      const r = {
-        left: cell.offsetLeft,
-        top: cell.offsetTop,
-        right: cell.offsetLeft + cell.offsetWidth,
-        width: cell.offsetWidth,
-        height: cell.offsetHeight,
-      };
-      const rowBase = rowBaseTop[row] || HEADER_BASE_PX;
-      const baseTop = Math.round(r.top + rowBase);
       singleDay.forEach((t) => {
         const lane = cellLaneMap.get(ds) || 0;
         cellLaneMap.set(ds, lane + 1);
         rowSlots[row] = Math.max(rowSlots[row] || 0, lane + 1);
-        const impKey = t.importance === "high" ? "high" : t.importance === "low" ? "low" : "medium";
-        const impToken = "■ ";
-        const stKey = t.status === "on-going" ? "ongoing" : t.status === "done" ? "done" : "ready";
-        const line = document.createElement("div");
-        line.className = "calendar-range-line";
-        line.style.background = statusBarColor(t.status);
-        line.dataset.tipToken = impToken;
-        line.dataset.tipBody = `${taskLabel(t)}`;
-        line.classList.add(`calendar-range-line--tip-${stKey}`, `calendar-range-line--tip-imp-${impKey}`);
-        line.tabIndex = 0;
-        const updateTipAnchorPos = (e) => {
-          if (!(e instanceof MouseEvent)) return;
-          const rr = line.getBoundingClientRect();
-          const x = Math.max(0, Math.min(rr.width, e.clientX - rr.left));
-          const y = Math.max(0, Math.min(rr.height, e.clientY - rr.top));
-          line.style.setProperty("--tip-x", `${Math.round(x)}px`);
-          line.style.setProperty("--tip-y", `${Math.round(y)}px`);
-        };
-        line.addEventListener("mouseenter", updateTipAnchorPos);
-        line.addEventListener("mousemove", updateTipAnchorPos);
-        const openFromLine = () => openModal(ds, t.id);
-        bindRangeDrag(line, t, ds);
-        line.addEventListener("click", (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          if (suppressRangeClickTaskId === t.id && Date.now() <= suppressRangeClickUntil) return;
-          openFromLine();
-        });
-        line.addEventListener("keydown", (e) => {
-          if (e.key !== "Enter" && e.key !== " ") return;
-          e.preventDefault();
-          e.stopPropagation();
-          openFromLine();
-        });
-        line.style.left = Math.round(r.left) + "px";
-        line.style.top = baseTop + lane * LINE_STEP + "px";
-        line.style.width = Math.round(r.width) + "px";
-        layer.appendChild(line);
-        const lineBottomAbs = r.top + rowBase + lane * LINE_STEP + BAR_HEIGHT;
-        const prevBottom = dateBarBottomAbsMap.get(ds) || -Infinity;
-        if (lineBottomAbs > prevBottom) dateBarBottomAbsMap.set(ds, lineBottomAbs);
+        paintList.push({ kind: "single", task: t, ds, row, lane });
       });
     });
 
-    /** @type {Record<number, number>} */
-    const rowLaneMax = {};
-    const DOT_GAP_PX = 20;
-    const SPACER_MARGIN_TOP = 4;
-    const SPACER_MARGIN_BOTTOM = 12;
-    const DOTS_MIN_PX = 28;
+    allCells.forEach((cell, idx) => {
+      const ds = cell.dataset.dateStr || "";
+      const row = Math.floor(idx / 7);
+      rowLaneMax[row] = Math.max(rowLaneMax[row] || 0, cellLaneMap.get(ds) || 0, rowSlots[row] || 0);
+    });
 
     const estimateDotsHeight = (cell, ds) => {
       const dotsEl = /** @type {HTMLElement | null} */ (cell.querySelector(".calendar-cell__dots"));
       const measured = dotsEl ? dotsEl.offsetHeight : 0;
-      if (measured > 0) return measured;
+      if (measured > 0) return Math.max(DOTS_FLOOR_PX, measured);
       const count = tasks.filter((t) => taskCoversDate(t, ds)).length;
-      // ~4 dots per row on narrow phones, ~14px per row
-      return Math.max(DOTS_MIN_PX, Math.ceil(Math.max(count, 1) / 3) * 14);
+      return Math.max(DOTS_FLOOR_PX, Math.ceil(Math.max(count, 1) / 3) * 14);
     };
 
-    const syncCellSpacers = (preserveBoost) => {
-      allCells.forEach((cell, idx) => {
-        const ds = cell.dataset.dateStr || "";
-        const lanes = cellLaneMap.get(ds) || 0;
-        const row = Math.floor(idx / 7);
-        rowLaneMax[row] = Math.max(rowLaneMax[row] || 0, lanes);
-        cell.style.setProperty("--range-lanes", String(lanes));
+    const stackHeight = (lanes) => (lanes > 0 ? BAR_HEIGHT + (lanes - 1) * LINE_STEP : 0);
 
-        const spacerEl = /** @type {HTMLElement | null} */ (cell.querySelector(".calendar-cell__range-spacer"));
-        const dotsEl = /** @type {HTMLElement | null} */ (cell.querySelector(".calendar-cell__dots"));
-        const numEl = /** @type {HTMLElement | null} */ (cell.querySelector(".calendar-cell__num"));
-        if (dotsEl) dotsEl.style.marginTop = "0px";
-
-        const numBottom = numEl ? numEl.offsetTop + numEl.offsetHeight : 0;
-        const spacerStart = numBottom + SPACER_MARGIN_TOP;
-        const stackPx = lanes > 0 ? BAR_HEIGHT + (lanes - 1) * LINE_STEP : 0;
-        const rowBase = rowBaseTop[row] || HEADER_BASE_PX;
-        const barBottomRel = dateBarBottomAbsMap.has(ds)
-          ? dateBarBottomAbsMap.get(ds) - cell.offsetTop
-          : rowBase + stackPx;
-        const needSpacer = Math.max(
-          0,
-          Math.ceil(barBottomRel + DOT_GAP_PX - spacerStart - SPACER_MARGIN_BOTTOM),
-          stackPx
-        );
-        const prev = preserveBoost
-          ? Math.max(
-              parseFloat(cell.style.getPropertyValue("--range-stack-px")) || 0,
-              spacerEl ? parseFloat(spacerEl.style.height) || 0 : 0
-            )
-          : 0;
-        const next = Math.max(prev, needSpacer);
-        cell.style.setProperty("--range-stack-px", `${next}px`);
-        if (spacerEl) spacerEl.style.height = `${next}px`;
-      });
-    };
-
-    /** 셀 콘텐츠(헤더+spacer+dots)와 바 하단을 모두 덮는 행 높이 강제 */
-    const forceRowHeightsForBarsAndDots = (extraByRow = {}) => {
+    // --- Phase 2: size spacers + row heights BEFORE drawing (row-max lanes) ---
+    const applySpacersAndRowHeights = (extraByRow = {}) => {
       const rowCount = Math.ceil(allCells.length / 7);
       const heights = [];
       for (let row = 0; row < rowCount; row++) {
-        let need = 108;
+        const lanes = rowLaneMax[row] || 0;
+        const rowBase = rowBaseTop[row] || HEADER_BASE_PX;
+        const stack = stackHeight(lanes);
+        const barBottomRel = rowBase + stack;
+        let rowNeed = 108;
         const inRow = allCells.slice(row * 7, row * 7 + 7);
         inRow.forEach((cell) => {
           const ds = cell.dataset.dateStr || "";
-          const dotsH = estimateDotsHeight(cell, ds);
-          const barBottomRel = dateBarBottomAbsMap.has(ds)
-            ? dateBarBottomAbsMap.get(ds) - cell.offsetTop
+          const spacerEl = /** @type {HTMLElement | null} */ (cell.querySelector(".calendar-cell__range-spacer"));
+          const dotsEl = /** @type {HTMLElement | null} */ (cell.querySelector(".calendar-cell__dots"));
+          const numEl = /** @type {HTMLElement | null} */ (cell.querySelector(".calendar-cell__num"));
+          if (dotsEl) dotsEl.style.marginTop = "0px";
+          const numBottom = numEl ? numEl.offsetTop + numEl.offsetHeight : 0;
+          const spacerStart = numBottom + SPACER_MARGIN_TOP;
+          // Clear the full row stack so multi-day bars never hit dots on any day
+          const needSpacer = Math.max(0, Math.ceil(barBottomRel + DOT_GAP_PX - spacerStart - SPACER_MARGIN_BOTTOM));
+          const prev = finalPass
+            ? Math.max(
+                parseFloat(cell.style.getPropertyValue("--range-stack-px")) || 0,
+                spacerEl ? parseFloat(spacerEl.style.height) || 0 : 0
+              )
             : 0;
-          const scrollH = cell.scrollHeight || 0;
-          const contentH = Math.max(
-            scrollH,
-            barBottomRel + DOT_GAP_PX + dotsH + 12,
-            (rowBaseTop[row] || HEADER_BASE_PX) +
-              ((rowLaneMax[row] || 0) > 0
-                ? BAR_HEIGHT + ((rowLaneMax[row] || 1) - 1) * LINE_STEP
-                : 0) +
-              DOT_GAP_PX +
-              dotsH +
-              12
-          );
-          if (contentH > need) need = contentH;
+          const next = Math.max(prev, needSpacer, stack);
+          cell.style.setProperty("--range-lanes", String(lanes));
+          cell.style.setProperty("--range-stack-px", `${next}px`);
+          if (spacerEl) spacerEl.style.height = `${next}px`;
+
+          const dotsH = estimateDotsHeight(cell, ds);
+          const cellNeed = spacerStart + next + SPACER_MARGIN_BOTTOM + dotsH + 8;
+          if (cellNeed > rowNeed) rowNeed = cellNeed;
+          if (barBottomRel + DOT_GAP_PX + dotsH + 8 > rowNeed) {
+            rowNeed = barBottomRel + DOT_GAP_PX + dotsH + 8;
+          }
         });
-        need += extraByRow[row] || 0;
-        heights.push(`${Math.ceil(need)}px`);
+        heights.push(`${Math.ceil(rowNeed + (extraByRow[row] || 0))}px`);
       }
       calendarGrid.style.gridTemplateRows = heights.join(" ");
+      void calendarGrid.offsetHeight;
     };
 
-    syncCellSpacers(!!finalPass);
-    // spacer 반영 후 레이아웃을 한 번 읽어야 scrollHeight가 맞다
-    void calendarGrid.offsetHeight;
-    forceRowHeightsForBarsAndDots();
+    applySpacersAndRowHeights();
+
+    // --- Phase 3: draw bars into pre-sized space ---
+    /** @type {Map<string, number>} */
+    const dateBarBottomAbsMap = new Map();
+
+    const attachLineInteractions = (line, task, openDs) => {
+      const impKey = task.importance === "high" ? "high" : task.importance === "low" ? "low" : "medium";
+      const stKey = task.status === "on-going" ? "ongoing" : task.status === "done" ? "done" : "ready";
+      line.dataset.tipToken = "■ ";
+      line.dataset.tipBody = `${taskLabel(task)}`;
+      line.classList.add(`calendar-range-line--tip-${stKey}`, `calendar-range-line--tip-imp-${impKey}`);
+      line.tabIndex = 0;
+      const updateTipAnchorPos = (e) => {
+        if (!(e instanceof MouseEvent)) return;
+        const rr = line.getBoundingClientRect();
+        const x = Math.max(0, Math.min(rr.width, e.clientX - rr.left));
+        const y = Math.max(0, Math.min(rr.height, e.clientY - rr.top));
+        line.style.setProperty("--tip-x", `${Math.round(x)}px`);
+        line.style.setProperty("--tip-y", `${Math.round(y)}px`);
+      };
+      line.addEventListener("mouseenter", updateTipAnchorPos);
+      line.addEventListener("mousemove", updateTipAnchorPos);
+      const openFromLine = () => openModal(openDs, task.id);
+      bindRangeDrag(line, task, openDs);
+      line.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (suppressRangeClickTaskId === task.id && Date.now() <= suppressRangeClickUntil) return;
+        openFromLine();
+      });
+      line.addEventListener("keydown", (e) => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        e.stopPropagation();
+        openFromLine();
+      });
+    };
+
+    paintList.forEach((item) => {
+      const rowBase = rowBaseTop[item.row] || HEADER_BASE_PX;
+      if (item.kind === "multi") {
+        const dateRun = item.dateRun || [];
+        const firstCell = cellByDate.get(dateRun[0]);
+        const lastCell = cellByDate.get(dateRun[dateRun.length - 1]);
+        if (!firstCell || !lastCell) return;
+        const lineTop = Math.round(firstCell.offsetTop + rowBase + item.lane * LINE_STEP);
+        const line = document.createElement("div");
+        line.className = "calendar-range-line";
+        line.style.background = rangeLineColorForTask(item.task, item.endStr);
+        line.style.left = Math.round(firstCell.offsetLeft) + "px";
+        line.style.top = lineTop + "px";
+        line.style.width = Math.round(lastCell.offsetLeft + lastCell.offsetWidth - firstCell.offsetLeft) + "px";
+        attachLineInteractions(line, item.task, dateRun[0]);
+        layer.appendChild(line);
+        const lineBottomAbs = lineTop + BAR_HEIGHT;
+        dateRun.forEach((ds) => {
+          dateBarBottomAbsMap.set(ds, Math.max(dateBarBottomAbsMap.get(ds) || 0, lineBottomAbs));
+        });
+        return;
+      }
+      const ds = item.ds || "";
+      const cell = cellByDate.get(ds);
+      if (!cell) return;
+      const lineTop = Math.round(cell.offsetTop + rowBase + item.lane * LINE_STEP);
+      const line = document.createElement("div");
+      line.className = "calendar-range-line";
+      line.style.background = statusBarColor(item.task.status);
+      line.style.left = Math.round(cell.offsetLeft) + "px";
+      line.style.top = lineTop + "px";
+      line.style.width = Math.round(cell.offsetWidth) + "px";
+      attachLineInteractions(line, item.task, ds);
+      layer.appendChild(line);
+      dateBarBottomAbsMap.set(ds, Math.max(dateBarBottomAbsMap.get(ds) || 0, lineTop + BAR_HEIGHT));
+    });
 
     if (!finalPass) {
       requestAnimationFrame(() => renderMultiDayRangeLines(true));
       return;
     }
 
-    // final pass: 바가 점을 가리거나, 점이 셀 밖으로 잘리면 행을 더 키운다
+    // --- Phase 4: hard verify — bars must stay above dots ---
     if (barDotLayoutFixAttempts < 24) {
       /** @type {Record<number, number>} */
       const growByRow = {};
-      /** @type {Map<string, number>} */
-      const spacerBoostByDate = new Map();
       const lines = [...layer.querySelectorAll(".calendar-range-line")];
       const lineRects = lines.map((line) => line.getBoundingClientRect());
       allCells.forEach((cell, idx) => {
         const row = Math.floor(idx / 7);
-        const ds = cell.dataset.dateStr || "";
         const dotsEl = /** @type {HTMLElement | null} */ (cell.querySelector(".calendar-cell__dots"));
-        if (!dotsEl || !ds) return;
+        if (!dotsEl) return;
         const cellRect = cell.getBoundingClientRect();
         const dotsRect = dotsEl.getBoundingClientRect();
         let maxBarBottom = -Infinity;
         lineRects.forEach((r) => {
           if (r.bottom <= cellRect.top || r.top >= cellRect.bottom) return;
-          if (r.right <= cellRect.left || r.left >= cellRect.right) return;
+          if (r.right <= cellRect.left + 0.5 || r.left >= cellRect.right - 0.5) return;
           if (r.bottom > maxBarBottom) maxBarBottom = r.bottom;
         });
-
         let grow = 0;
-        // 1) 점이 셀 밖으로 밀림
         if (dotsRect.bottom > cellRect.bottom + 0.5) {
-          grow = Math.max(grow, Math.ceil(dotsRect.bottom - cellRect.bottom + 16));
+          grow = Math.max(grow, Math.ceil(dotsRect.bottom - cellRect.bottom + 12));
         }
-        // 2) 바가 점 영역을 침범
         if (Number.isFinite(maxBarBottom) && maxBarBottom + DOT_GAP_PX > dotsRect.top) {
           grow = Math.max(grow, Math.ceil(maxBarBottom + DOT_GAP_PX - dotsRect.top));
         }
-        // 3) 점 높이가 셀 안에 확보되지 않음 (바가 바닥까지 찬 경우)
-        const dotsH = estimateDotsHeight(cell, ds);
-        const roomBelowBars = Number.isFinite(maxBarBottom)
-          ? cellRect.bottom - maxBarBottom
-          : cellRect.height;
-        if (roomBelowBars < dotsH + DOT_GAP_PX) {
-          grow = Math.max(grow, Math.ceil(dotsH + DOT_GAP_PX - roomBelowBars));
+        const room = Number.isFinite(maxBarBottom) ? cellRect.bottom - maxBarBottom : cellRect.height;
+        const dotsH = estimateDotsHeight(cell, cell.dataset.dateStr || "");
+        if (room < dotsH + DOT_GAP_PX) {
+          grow = Math.max(grow, Math.ceil(dotsH + DOT_GAP_PX - room));
         }
-
-        if (grow > 0) {
-          growByRow[row] = Math.max(growByRow[row] || 0, grow);
-          spacerBoostByDate.set(ds, Math.max(spacerBoostByDate.get(ds) || 0, grow));
-        }
+        if (grow > 0) growByRow[row] = Math.max(growByRow[row] || 0, grow);
       });
 
       if (Object.keys(growByRow).length > 0) {
-        spacerBoostByDate.forEach((boost, ds) => {
-          const cell = cellByDate.get(ds);
-          if (!cell) return;
-          const spacerEl = /** @type {HTMLElement | null} */ (cell.querySelector(".calendar-cell__range-spacer"));
-          const cur = Math.max(
-            parseFloat(cell.style.getPropertyValue("--range-stack-px")) || 0,
-            spacerEl ? parseFloat(spacerEl.style.height) || 0 : 0
-          );
-          const next = cur + boost;
-          cell.style.setProperty("--range-stack-px", `${next}px`);
-          if (spacerEl) spacerEl.style.height = `${next}px`;
+        // permanently bump rowLaneMax visually via spacer boost on all cells in grown rows
+        Object.keys(growByRow).forEach((rowStr) => {
+          const row = Number(rowStr);
+          const boost = growByRow[row] || 0;
+          allCells.slice(row * 7, row * 7 + 7).forEach((cell) => {
+            const spacerEl = /** @type {HTMLElement | null} */ (cell.querySelector(".calendar-cell__range-spacer"));
+            const cur = Math.max(
+              parseFloat(cell.style.getPropertyValue("--range-stack-px")) || 0,
+              spacerEl ? parseFloat(spacerEl.style.height) || 0 : 0
+            );
+            const next = cur + boost;
+            cell.style.setProperty("--range-stack-px", `${next}px`);
+            if (spacerEl) spacerEl.style.height = `${next}px`;
+          });
         });
-        void calendarGrid.offsetHeight;
-        forceRowHeightsForBarsAndDots(growByRow);
+        applySpacersAndRowHeights(growByRow);
         barDotLayoutFixAttempts += 1;
         requestAnimationFrame(() => renderMultiDayRangeLines(true));
         return;
@@ -2115,12 +2025,6 @@
     }
   }
 
-
-
-  /**
-   * 일정 밀도에 따라 해당 주의 행 높이를 늘린다.
-   * @param {Record<number, number>} rowSlots
-   */
   function applyCalendarRowHeights(
     rowSlots,
     rowLaneMax = {},
@@ -4198,7 +4102,7 @@
     if (location.protocol !== "http:" && location.protocol !== "https:") return;
     window.addEventListener("load", () => {
       navigator.serviceWorker
-        .register("sw.js?v=8")
+        .register("sw.js?v=9")
         .then((reg) => {
           reg.update().catch(() => {});
           if (reg.waiting) reg.waiting.postMessage({ type: "SKIP_WAITING" });
@@ -4208,8 +4112,8 @@
         });
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         // new SW took control — reload once so calendar layout code is fresh
-        if (sessionStorage.getItem("sw-reloaded-v8")) return;
-        sessionStorage.setItem("sw-reloaded-v8", "1");
+        if (sessionStorage.getItem("sw-reloaded-v9")) return;
+        sessionStorage.setItem("sw-reloaded-v9", "1");
         location.reload();
       });
     });
