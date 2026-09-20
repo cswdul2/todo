@@ -1,19 +1,19 @@
 /* 일정 관리 앱 서비스 워커: 앱 셸 캐시 + 오프라인 대응 */
 "use strict";
 
-const CACHE_VERSION = "v27";
+const CACHE_VERSION = "v28";
 const CACHE_NAME = `calendar-app-shell-${CACHE_VERSION}`;
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css?v=27",
-  "./app.js?v=27",
-  "./manifest.webmanifest?v=27",
-  "./app-icon.svg?v=27",
-  "./icon-192.png?v=27",
-  "./icon-512.png?v=27",
-  "./icon-maskable-512.png?v=27",
-  "./apple-touch-icon.png?v=27",
+  "./styles.css?v=28",
+  "./app.js?v=28",
+  "./manifest.webmanifest?v=28",
+  "./app-icon.svg?v=28",
+  "./icon-192.png?v=28",
+  "./icon-512.png?v=28",
+  "./icon-maskable-512.png?v=28",
+  "./apple-touch-icon.png?v=28",
 ];
 
 self.addEventListener("install", (event) => {
