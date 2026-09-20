@@ -150,11 +150,16 @@
             <label class="modal__quick-meta-label" for="taskEffortValue">투입예상공수</label>
             <div class="modal__quick-effort">
               <input type="number" id="taskEffortValue" name="effortValue" min="0" step="1" placeholder="예: 24" class="modal__quick-input" />
-              <select id="taskEffortUnit" name="effortUnit" class="modal__quick-input modal__quick-unit">
+              <div id="taskEffortUnitToggle" class="modal__quick-unit-toggle" role="radiogroup" aria-label="투입예상공수 단위 (1MD = 24MH)">
+                <button type="button" class="modal__quick-unit-btn" data-unit="MH" role="radio" aria-checked="true">MH</button>
+                <button type="button" class="modal__quick-unit-btn" data-unit="MD" role="radio" aria-checked="false">MD</button>
+              </div>
+              <select id="taskEffortUnit" name="effortUnit" class="modal__quick-input modal__quick-unit modal__quick-unit--native" aria-hidden="true" tabindex="-1">
                 <option value="MH">MH</option>
                 <option value="MD">MD</option>
               </select>
             </div>
+            <span class="modal__quick-unit-hint" aria-hidden="true">단위 선택: MH / MD (1MD = 24MH)</span>
           </div>
           <div class="modal__quick-line modal__quick-line--actual">
             <label class="modal__quick-meta-label" for="taskActualEffortValue">투입실적공수</label>

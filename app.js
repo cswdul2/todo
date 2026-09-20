@@ -61,6 +61,7 @@
   const taskDescription = document.getElementById("taskDescription");
   const taskEffortValue = document.getElementById("taskEffortValue");
   const taskEffortUnit = document.getElementById("taskEffortUnit");
+  const taskEffortUnitToggle = document.getElementById("taskEffortUnitToggle");
   const taskActualEffortValue = document.getElementById("taskActualEffortValue");
   const deliverableNameInput = document.getElementById("deliverableNameInput");
   const deliverableImportanceInput = document.getElementById("deliverableImportanceInput");
@@ -729,6 +730,20 @@
     const raw = Number(task.effortValue);
     if (!Number.isFinite(raw) || raw <= 0) return 0;
     return task.effortUnit === "MD" ? raw * 24 : raw;
+  }
+
+  function pickTopPlannedTaskForDate(dateStr) {
+    const onDay = tasks.filter((t) => taskCoversDate(t, dateStr));
+    if (!onDay.length) return null;
+    const sorted = [...onDay].sort((a, b) => {
+      const mhDiff = taskTotalMh(b) - taskTotalMh(a);
+      if (Math.abs(mhDiff) > 1e-9) return mhDiff;
+      const ia = IMP_ORDER[a.importance] ?? 1;
+      const ib = IMP_ORDER[b.importance] ?? 1;
+      if (ia !== ib) return ia - ib;
+      return taskLabel(a).localeCompare(taskLabel(b), "ko");
+    });
+    return sorted[0] || null;
   }
 
   function importanceWeight(importance) {
@@ -1458,6 +1473,17 @@
         btn.setAttribute("aria-checked", active ? "true" : "false");
       });
     }
+  }
+
+  function renderEffortUnitToggle() {
+    if (!taskEffortUnitToggle || !taskEffortUnit) return;
+    const unit = taskEffortUnit.value === "MD" ? "MD" : "MH";
+    const buttons = taskEffortUnitToggle.querySelectorAll("button[data-unit]");
+    buttons.forEach((btn) => {
+      const active = btn.getAttribute("data-unit") === unit;
+      btn.classList.toggle("modal__quick-unit-btn--active", active);
+      btn.setAttribute("aria-checked", active ? "true" : "false");
+    });
   }
 
   function applyModalTheme() {
@@ -2311,6 +2337,7 @@
 
   function updateActualEffortPreview() {
     if (!taskActualEffortValue) return;
+    renderEffortUnitToggle();
     const effortRaw = Number(taskEffortValue.value);
     const effortUnit = taskEffortUnit.value === "MD" ? "MD" : "MH";
     if (!Number.isFinite(effortRaw) || effortRaw <= 0) {
@@ -2509,7 +2536,7 @@
         const num = cell.querySelector(".calendar-cell__num");
         if (num) num.insertAdjacentHTML("beforeend", ` <span class="calendar-cell__holiday-name">${escapeHtml(holidayName)}</span>`);
       }
-      cell.addEventListener("click", () => openModal(cell.dataset.dateStr, null, true));
+      cell.addEventListener("click", () => openModal(cell.dataset.dateStr));
       styleCellForDate(cell, cell.dataset.dateStr);
       calendarGrid.appendChild(cell);
     }
@@ -2542,7 +2569,7 @@
         const num = cell.querySelector(".calendar-cell__num");
         if (num) num.insertAdjacentHTML("beforeend", ` <span class="calendar-cell__holiday-name">${escapeHtml(holidayName)}</span>`);
       }
-      cell.addEventListener("click", () => openModal(ds, null, true));
+      cell.addEventListener("click", () => openModal(ds));
       styleCellForDate(cell, ds);
       calendarGrid.appendChild(cell);
     }
@@ -2564,7 +2591,7 @@
         const num = cell.querySelector(".calendar-cell__num");
         if (num) num.insertAdjacentHTML("beforeend", ` <span class="calendar-cell__holiday-name">${escapeHtml(holidayName)}</span>`);
       }
-      cell.addEventListener("click", () => openModal(cell.dataset.dateStr, null, true));
+      cell.addEventListener("click", () => openModal(cell.dataset.dateStr));
       styleCellForDate(cell, cell.dataset.dateStr);
       calendarGrid.appendChild(cell);
     }
@@ -2776,21 +2803,14 @@
         taskRecurrence.value = "none";
         updateActualEffortPreview();
       } else {
-      // 해당 날짜에 일정이 있으면 첫 항목을 기본 선택(날짜 변경 즉시 편집 가능)
-      const onDay = tasks
-        .filter((t) => taskCoversDate(t, dateStr))
-        .sort((a, b) => {
-          const ia = IMP_ORDER[a.importance] ?? 1;
-          const ib = IMP_ORDER[b.importance] ?? 1;
-          if (ia !== ib) return ia - ib;
-          return taskLabel(a).localeCompare(taskLabel(b), "ko");
-        });
-      if (onDay.length > 0) {
-        editingId = onDay[0].id;
+      // 해당 날짜 일정이 있으면 계획MH가 가장 큰 항목을 기본 편집 대상으로 연다.
+      const topPlannedTask = pickTopPlannedTaskForDate(dateStr);
+      if (topPlannedTask) {
+        editingId = topPlannedTask.id;
         modalDefaultWhite = false;
-        fillFormFromTask(onDay[0]);
-        draftStatus = onDay[0].status || "ready";
-        draftImportance = onDay[0].importance || "medium";
+        fillFormFromTask(topPlannedTask);
+        draftStatus = topPlannedTask.status || "ready";
+        draftImportance = topPlannedTask.importance || "medium";
       } else {
         draftStatus = "ready";
         draftImportance = "medium";
@@ -3855,7 +3875,29 @@
     taskEffortValue.addEventListener("input", updateActualEffortPreview);
   }
   if (taskEffortUnit) {
-    taskEffortUnit.addEventListener("change", updateActualEffortPreview);
+    taskEffortUnit.addEventListener("change", () => {
+      renderEffortUnitToggle();
+      updateActualEffortPreview();
+    });
+  }
+  if (taskEffortUnitToggle && taskEffortUnit) {
+    taskEffortUnitToggle.addEventListener("click", (e) => {
+      const btn = e.target instanceof HTMLElement ? e.target.closest("button[data-unit]") : null;
+      if (!(btn instanceof HTMLButtonElement)) return;
+      const unit = btn.getAttribute("data-unit") === "MD" ? "MD" : "MH";
+      if (taskEffortUnit.value === unit) return;
+      taskEffortUnit.value = unit;
+      renderEffortUnitToggle();
+      updateActualEffortPreview();
+    });
+    taskEffortUnitToggle.addEventListener("keydown", (e) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      e.preventDefault();
+      const nextUnit = taskEffortUnit.value === "MD" ? "MH" : "MD";
+      taskEffortUnit.value = nextUnit;
+      renderEffortUnitToggle();
+      updateActualEffortPreview();
+    });
   }
   if (btnDeliverableAddToggle) {
     btnDeliverableAddToggle.addEventListener("click", () => {

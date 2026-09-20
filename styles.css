@@ -1903,34 +1903,54 @@ body.calendar-dragging {
   text-align: center;
 }
 
-.modal__quick-unit {
-  width: 3.9rem;
-  min-width: 3.9rem;
-  padding-top: 0;
-  padding-bottom: 0;
-  padding-left: 0;
-  padding-right: 1.5rem;
-  text-align: center;
-  text-align-last: center;
-  line-height: 2.05rem;
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  background-image:
-    linear-gradient(to right, transparent calc(100% - 1.35rem), #cbd5e1 calc(100% - 1.35rem), #cbd5e1 calc(100% - 1.3rem), transparent calc(100% - 1.3rem)),
-    linear-gradient(45deg, transparent 50%, #334155 50%),
-    linear-gradient(135deg, #334155 50%, transparent 50%);
-  background-position:
-    0 0,
-    calc(100% - 0.72rem) calc(50% - 2px),
-    calc(100% - 0.5rem) calc(50% - 2px);
-  background-size:
-    100% 100%,
-    6px 6px,
-    6px 6px;
-  background-repeat: no-repeat;
-  position: relative;
-  top: 0;
+.modal__quick-unit-toggle {
+  flex: 0 0 auto;
+  min-width: 8.9rem;
+  height: 2.1rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.25rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #f8fafc;
+  padding: 0.18rem;
+}
+
+.modal__quick-unit-btn {
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: #334155;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 0.08s ease, background-color 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.modal__quick-unit-btn:hover {
+  transform: translateY(-1px);
+}
+
+.modal__quick-unit-btn--active {
+  background: #334155;
+  border-color: #334155;
+  color: #fff;
+  box-shadow: 0 3px 8px rgba(51, 65, 85, 0.35);
+}
+
+.modal__quick-unit--native {
+  display: none;
+}
+
+.modal__quick-unit-hint {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.66rem;
+  font-weight: 600;
+  color: #64748b;
+  text-align: right;
 }
 
 .modal__quick-meta-label {
@@ -3375,6 +3395,18 @@ body.calendar-dragging {
     font-size: 0.76rem;
   }
 
+  .modal__quick-unit-toggle {
+    min-width: 7.8rem;
+  }
+
+  .modal__quick-unit-btn {
+    font-size: 0.75rem;
+  }
+
+  .modal__quick-unit-hint {
+    font-size: 0.62rem;
+  }
+
   .weekdays {
     font-size: 0.68rem;
     margin-bottom: 4px;
@@ -3452,6 +3484,10 @@ body.calendar-dragging {
   .btn-today {
     font-size: 0.74rem;
     min-height: 2.05rem;
+  }
+
+  .modal__quick-unit-toggle {
+    min-width: 7.1rem;
   }
 
   .month-title {
