@@ -3666,6 +3666,11 @@ body.calendar-dragging {
   .calendar-cell__dot-wrap[data-tip-body]::after {
     display: none !important;
   }
+
+  .deliverable-editor {
+    --deliverable-font-size: 16px;
+    --deliverable-row-h: 2.1rem;
+  }
 }
 
 /* 시작일·종료일에 마우스를 올리면 뜨는 달력 */
@@ -3726,6 +3731,10 @@ body.calendar-dragging {
   gap: 2px;
 }
 
+.date-pop__grid {
+  touch-action: none;
+}
+
 .date-pop__weekday {
   text-align: center;
   font-size: 0.68rem;
@@ -3752,6 +3761,7 @@ body.calendar-dragging {
   font-size: 0.76rem;
   cursor: pointer;
   transition: background 0.1s ease, border-color 0.1s ease, transform 0.08s ease;
+  touch-action: none;
 }
 
 .date-pop__day--blank {

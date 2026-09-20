@@ -3871,13 +3871,30 @@
     if (left + popRect.width > window.innerWidth - margin) {
       left = Math.max(margin, window.innerWidth - margin - popRect.width);
     }
-    let top = rect.bottom + 6;
-    if (top + popRect.height > window.innerHeight - margin) {
-      const above = rect.top - 6 - popRect.height;
-      top = above >= margin ? above : Math.max(margin, window.innerHeight - margin - popRect.height);
+    const modalContainer = anchorEl.closest(".modal__inner");
+    let minTop = margin;
+    let maxTop = window.innerHeight - margin - popRect.height;
+    if (modalContainer instanceof HTMLElement) {
+      const containerRect = modalContainer.getBoundingClientRect();
+      minTop = Math.max(minTop, containerRect.top + 4);
+      maxTop = Math.min(maxTop, containerRect.bottom - 4 - popRect.height);
     }
+    if (maxTop < minTop) maxTop = minTop;
+    let top = rect.bottom + 6;
+    if (top > maxTop) {
+      const above = rect.top - 6 - popRect.height;
+      top = above >= minTop ? above : maxTop;
+    }
+    if (top < minTop) top = minTop;
     datePopEl.style.left = `${Math.round(left)}px`;
     datePopEl.style.top = `${Math.round(top)}px`;
+  }
+
+  function getDatePopAnchorInput() {
+    if (datePopField === "deliverable" && datePopDeliverableInput instanceof HTMLInputElement) return datePopDeliverableInput;
+    if (datePopField === "start" && taskStart instanceof HTMLInputElement) return taskStart;
+    if (datePopField === "end" && taskEnd instanceof HTMLInputElement) return taskEnd;
+    return null;
   }
 
   function renderDatePop() {
@@ -4094,6 +4111,18 @@
   window.addEventListener("scroll", () => {
     if (isDatePopOpen()) closeDatePop();
   }, true);
+
+  if (modalInner instanceof HTMLElement) {
+    modalInner.addEventListener(
+      "scroll",
+      () => {
+        if (!isDatePopOpen()) return;
+        const anchor = getDatePopAnchorInput();
+        if (anchor) positionDatePop(anchor);
+      },
+      { passive: true }
+    );
+  }
 
   taskStart.addEventListener("change", () => {
     if (taskStart.value && taskEnd.value && parseDateStr(taskStart.value) > parseDateStr(taskEnd.value)) {
@@ -4530,7 +4559,7 @@
     if (location.protocol !== "http:" && location.protocol !== "https:") return;
     window.addEventListener("load", () => {
       navigator.serviceWorker
-        .register("sw.js?v=23")
+        .register("sw.js?v=24")
         .then((reg) => {
           reg.update().catch(() => {});
           if (reg.waiting) reg.waiting.postMessage({ type: "SKIP_WAITING" });
@@ -4540,8 +4569,8 @@
         });
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         // new SW took control — reload once so calendar layout code is fresh
-        if (sessionStorage.getItem("sw-reloaded-v23")) return;
-        sessionStorage.setItem("sw-reloaded-v23", "1");
+        if (sessionStorage.getItem("sw-reloaded-v24")) return;
+        sessionStorage.setItem("sw-reloaded-v24", "1");
         location.reload();
       });
     });
