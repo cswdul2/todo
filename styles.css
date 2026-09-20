@@ -1740,6 +1740,11 @@ body.calendar-dragging {
   box-shadow: 0 2px 8px rgba(30, 64, 175, 0.18);
 }
 
+.modal__btn-close-top {
+  flex-shrink: 0;
+  border-radius: 8px;
+}
+
 .modal__field {
   margin-bottom: 1rem;
 }
@@ -3049,7 +3054,8 @@ body.calendar-dragging {
   border: 1px solid transparent;
 }
 
-.modal__topbar .btn.modal__btn-new-top {
+.modal__topbar .btn.modal__btn-new-top,
+.modal__topbar .btn.modal__btn-close-top {
   margin: 0;
   box-sizing: border-box;
   height: var(--modal-topbar-control-h);
@@ -3323,6 +3329,10 @@ body.calendar-dragging {
   }
 
   .modal__topbar .btn.modal__btn-new-top {
+    width: 100%;
+  }
+
+  .modal__topbar .btn.modal__btn-close-top {
     width: 100%;
   }
 

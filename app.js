@@ -76,6 +76,7 @@
   const existingTasksWrap = document.getElementById("existingTasksWrap");
   const existingTasksList = document.getElementById("existingTasksList");
   const btnNewTask = document.getElementById("btnNewTask");
+  const btnCloseModalTop = document.getElementById("btnCloseModalTop");
   const btnExport = document.getElementById("btnExport");
   const btnImport = document.getElementById("btnImport");
   const importFileInput = document.getElementById("importFileInput");
@@ -4179,8 +4180,8 @@
   searchInput.addEventListener("input", updateSearchResults);
   searchStatus.addEventListener("change", updateSearchResults);
 
-  // 모달 바깥 클릭 = 완료: 변경이 있으면 저장하고, 없으면 그냥 닫는다.
-  modalBackdrop.addEventListener("click", () => {
+  // 모달 닫기 요청: 변경이 있으면 저장하고, 없으면 그냥 닫는다.
+  function requestCloseTaskModal() {
     if (taskModal.hidden) return;
     if (isEffectivelyEmptyDraft()) {
       closeModal();
@@ -4191,7 +4192,11 @@
       return;
     }
     closeModal();
-  });
+  }
+
+  // 모달 바깥 클릭 = 완료
+  modalBackdrop.addEventListener("click", requestCloseTaskModal);
+  if (btnCloseModalTop) btnCloseModalTop.addEventListener("click", requestCloseTaskModal);
 
   btnDelete.addEventListener("click", deleteTask);
 
