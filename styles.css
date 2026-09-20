@@ -2330,6 +2330,7 @@ body.calendar-dragging {
 .deliverable-editor__head {
   display: grid;
   grid-template-columns: var(--deliverable-date-col) 1fr var(--deliverable-importance-col) var(--deliverable-action-col);
+  grid-template-areas: "date name imp act";
   gap: 0.45rem;
   align-items: center;
   padding: var(--deliverable-cell-pad-y) var(--deliverable-cell-pad-x);
@@ -2357,6 +2358,7 @@ body.calendar-dragging {
 }
 
 .deliverable-editor__action-spacer {
+  grid-area: act;
   width: 100%;
   min-height: var(--deliverable-row-h);
 }
@@ -2425,6 +2427,7 @@ body.calendar-dragging {
   width: var(--deliverable-date-col);
   min-height: var(--deliverable-row-h);
   align-self: center;
+  grid-area: date;
 }
 
 /* 산출물 입력/목록 행: 산출물명 필드와 동일한 바깥 높이(--deliverable-row-h) */
@@ -2448,6 +2451,7 @@ body.calendar-dragging {
 }
 
 .deliverable-editor__importance {
+  grid-area: imp;
   width: 100%;
   min-width: 0;
   margin: 0;
@@ -2461,6 +2465,7 @@ body.calendar-dragging {
 }
 
 .deliverable-editor__name {
+  grid-area: name;
   width: 100%;
   min-width: 0;
   margin: 0;
@@ -2504,6 +2509,7 @@ body.calendar-dragging {
 .deliverable-item {
   display: grid;
   grid-template-columns: var(--deliverable-date-col) 1fr var(--deliverable-importance-col) var(--deliverable-action-col);
+  grid-template-areas: "date name imp act";
   gap: 0.45rem;
   align-items: center;
   padding: var(--deliverable-cell-pad-y) var(--deliverable-cell-pad-x);
@@ -2528,21 +2534,46 @@ body.calendar-dragging {
 }
 
 .deliverable-item__completed-at {
+  grid-area: date;
   width: 100%;
   min-width: 0;
+  max-width: 100%;
   margin: 0;
   padding: 0 0.22rem;
   border: 1px solid #cbd5e1;
-  border-radius: 6px;
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.95);
   color: #0f172a;
+  -webkit-text-fill-color: #0f172a;
+  color-scheme: light;
   font: inherit;
-  font-size: 0.68rem;
+  font-size: 0.74rem;
+  font-variant-numeric: tabular-nums;
   line-height: calc(var(--deliverable-row-h) - 2px);
   box-sizing: border-box;
+  appearance: none;
+  -webkit-appearance: none;
+  text-align: center;
+}
+
+.deliverable-item__completed-at::-webkit-datetime-edit {
+  color: #0f172a;
+  line-height: calc(var(--deliverable-row-h) - 2px);
+}
+
+.deliverable-item__completed-at::-webkit-datetime-edit-fields-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+.deliverable-item__completed-at::-webkit-calendar-picker-indicator {
+  margin-left: 0.08rem;
 }
 
 .deliverable-item__name-input {
+  grid-area: name;
   width: 100%;
   min-width: 0;
   padding: 0.32rem 0.5rem;
@@ -2563,6 +2594,7 @@ body.calendar-dragging {
 }
 
 .deliverable-item__importance-select {
+  grid-area: imp;
   width: 100%;
   min-width: 0;
   margin: 0;
@@ -2576,6 +2608,7 @@ body.calendar-dragging {
 }
 
 .deliverable-item__delete {
+  grid-area: act;
   width: 100%;
   min-width: 0;
   margin: 0;
@@ -3461,6 +3494,30 @@ body.calendar-dragging {
 
   .task-chip__status {
     display: none;
+  }
+
+  .deliverable-editor__head {
+    grid-template-columns: minmax(0, 1fr) var(--deliverable-importance-col) var(--deliverable-action-col);
+    grid-template-areas: "name imp act";
+  }
+
+  .deliverable-editor__spacer {
+    display: none;
+  }
+
+  .deliverable-item {
+    grid-template-columns: minmax(0, 1fr) var(--deliverable-importance-col) var(--deliverable-action-col);
+    grid-template-areas:
+      "date date date"
+      "name imp act";
+    row-gap: 0.32rem;
+  }
+
+  .deliverable-item__completed-at {
+    font-size: 0.82rem;
+    text-align: left;
+    padding-left: 0.4rem;
+    padding-right: 0.4rem;
   }
 }
 
