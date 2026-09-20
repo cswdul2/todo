@@ -4299,7 +4299,7 @@
     if (location.protocol !== "http:" && location.protocol !== "https:") return;
     window.addEventListener("load", () => {
       navigator.serviceWorker
-        .register("sw.js?v=14")
+        .register("sw.js?v=15")
         .then((reg) => {
           reg.update().catch(() => {});
           if (reg.waiting) reg.waiting.postMessage({ type: "SKIP_WAITING" });
@@ -4309,8 +4309,8 @@
         });
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         // new SW took control — reload once so calendar layout code is fresh
-        if (sessionStorage.getItem("sw-reloaded-v14")) return;
-        sessionStorage.setItem("sw-reloaded-v14", "1");
+        if (sessionStorage.getItem("sw-reloaded-v15")) return;
+        sessionStorage.setItem("sw-reloaded-v15", "1");
         location.reload();
       });
     });
