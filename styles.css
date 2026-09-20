@@ -3802,6 +3802,30 @@ body.calendar-dragging {
   font-weight: 700;
 }
 
+.date-pop__actions {
+  margin-top: 0.38rem;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.date-pop__clear {
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  background: #f8fafc;
+  color: #334155;
+  font: inherit;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.2;
+  padding: 0.26rem 0.42rem;
+  cursor: pointer;
+}
+
+.date-pop__clear:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
 .date-pop__hint {
   margin: 0.4rem 0 0;
   font-size: 0.66rem;

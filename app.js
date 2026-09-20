@@ -3689,6 +3689,8 @@
   let datePopGrid = null;
   /** @type {HTMLElement | null} */
   let datePopTitle = null;
+  /** @type {HTMLButtonElement | null} */
+  let datePopClearBtn = null;
   /** @type {'start' | 'end' | 'deliverable' | null} */
   let datePopField = null;
   let datePopYear = 0;
@@ -3759,6 +3761,7 @@
     datePopTouchPointerId = null;
     datePopField = null;
     datePopDeliverableInput = null;
+    if (datePopClearBtn) datePopClearBtn.hidden = true;
     if (datePopEl) datePopEl.hidden = true;
   }
 
@@ -3801,17 +3804,30 @@
         <span class="date-pop__weekday date-pop__weekday--sat">토</span>
       </div>
       <div class="date-pop__grid"></div>
+      <div class="date-pop__actions">
+        <button type="button" class="date-pop__clear" data-action="clear-deliverable" hidden>완료 취소 → Doing</button>
+      </div>
       <p class="date-pop__hint">클릭: 날짜 지정 · 드래그: 시작일~종료일 지정</p>
     `;
     document.body.appendChild(pop);
     datePopEl = pop;
     datePopGrid = pop.querySelector(".date-pop__grid");
     datePopTitle = pop.querySelector(".date-pop__title");
+    datePopClearBtn = pop.querySelector(".date-pop__clear");
 
     pop.addEventListener("mouseenter", cancelCloseDatePop);
     pop.addEventListener("mouseleave", scheduleCloseDatePop);
 
     pop.addEventListener("click", (e) => {
+      const actionBtn = e.target instanceof HTMLElement ? e.target.closest("[data-action='clear-deliverable']") : null;
+      if (actionBtn instanceof HTMLButtonElement) {
+        if (datePopField === "deliverable" && datePopDeliverableInput instanceof HTMLInputElement) {
+          datePopDeliverableInput.value = "";
+          datePopDeliverableInput.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+        closeDatePop();
+        return;
+      }
       const nav = e.target instanceof HTMLElement ? e.target.closest(".date-pop__nav") : null;
       if (!(nav instanceof HTMLElement)) return;
       const step = Number(nav.dataset.nav) || 0;
@@ -3867,6 +3883,16 @@
   function renderDatePop() {
     if (!datePopEl || !datePopGrid) return;
     if (datePopTitle) datePopTitle.textContent = `${datePopYear}년 ${datePopMonth + 1}월`;
+    if (datePopClearBtn) {
+      const isDeliverableMode = datePopField === "deliverable";
+      const hasCompletedDate =
+        isDeliverableMode &&
+        datePopDeliverableInput instanceof HTMLInputElement &&
+        !!normalizeCompletedAtDate(datePopDeliverableInput.value);
+      datePopClearBtn.hidden = !isDeliverableMode;
+      datePopClearBtn.disabled = !hasCompletedDate;
+      datePopClearBtn.textContent = hasCompletedDate ? "완료 취소 → Doing" : "Doing (진행중)";
+    }
 
     const startStr =
       datePopField === "deliverable" && datePopDeliverableInput
@@ -4504,7 +4530,7 @@
     if (location.protocol !== "http:" && location.protocol !== "https:") return;
     window.addEventListener("load", () => {
       navigator.serviceWorker
-        .register("sw.js?v=22")
+        .register("sw.js?v=23")
         .then((reg) => {
           reg.update().catch(() => {});
           if (reg.waiting) reg.waiting.postMessage({ type: "SKIP_WAITING" });
@@ -4514,8 +4540,8 @@
         });
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         // new SW took control — reload once so calendar layout code is fresh
-        if (sessionStorage.getItem("sw-reloaded-v22")) return;
-        sessionStorage.setItem("sw-reloaded-v22", "1");
+        if (sessionStorage.getItem("sw-reloaded-v23")) return;
+        sessionStorage.setItem("sw-reloaded-v23", "1");
         location.reload();
       });
     });
