@@ -3667,6 +3667,20 @@ body.calendar-dragging {
     display: none !important;
   }
 
+  .modal__field input[type="text"],
+  .modal__field input[type="date"],
+  .modal__field select,
+  .modal__field textarea,
+  .modal__quick-input,
+  .deliverable-editor__name,
+  .deliverable-editor__importance,
+  .deliverable-item__completed-at,
+  .deliverable-item__name-input,
+  .deliverable-item__importance-select {
+    font-size: 16px !important;
+    line-height: 1.2;
+  }
+
   .deliverable-editor {
     --deliverable-font-size: 16px;
     --deliverable-row-h: 2.1rem;

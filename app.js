@@ -1406,11 +1406,29 @@
     return typeof window.matchMedia === "function" && window.matchMedia("(hover: none) and (pointer: coarse)").matches;
   }
 
+  function normalizeViewportAfterOverlayClose() {
+    if (!isCoarsePointerDevice()) return;
+    const active = document.activeElement;
+    if (
+      active instanceof HTMLElement &&
+      (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement || active instanceof HTMLSelectElement)
+    ) {
+      active.blur();
+    }
+    requestAnimationFrame(() => {
+      const y = window.scrollY || window.pageYOffset || 0;
+      if (window.scrollX !== 0) window.scrollTo(0, y);
+    });
+  }
+
   function syncOverlayScrollLock() {
     const modalOpen = taskModal instanceof HTMLElement && !taskModal.hidden;
     const ocrOpen = ocrModal instanceof HTMLElement && !ocrModal.hidden;
     const confirmOpen = confirmPop instanceof HTMLElement && !confirmPop.hidden;
-    document.body.classList.toggle("body--overlay-open", modalOpen || ocrOpen || confirmOpen);
+    const shouldLock = modalOpen || ocrOpen || confirmOpen;
+    const wasLocked = document.body.classList.contains("body--overlay-open");
+    document.body.classList.toggle("body--overlay-open", shouldLock);
+    if (wasLocked && !shouldLock) normalizeViewportAfterOverlayClose();
   }
 
   function canSetDoneStatusFromModal() {
@@ -4559,7 +4577,7 @@
     if (location.protocol !== "http:" && location.protocol !== "https:") return;
     window.addEventListener("load", () => {
       navigator.serviceWorker
-        .register("sw.js?v=25")
+        .register("sw.js?v=26")
         .then((reg) => {
           reg.update().catch(() => {});
           if (reg.waiting) reg.waiting.postMessage({ type: "SKIP_WAITING" });
@@ -4569,8 +4587,8 @@
         });
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         // new SW took control — reload once so calendar layout code is fresh
-        if (sessionStorage.getItem("sw-reloaded-v25")) return;
-        sessionStorage.setItem("sw-reloaded-v25", "1");
+        if (sessionStorage.getItem("sw-reloaded-v26")) return;
+        sessionStorage.setItem("sw-reloaded-v26", "1");
         location.reload();
       });
     });
