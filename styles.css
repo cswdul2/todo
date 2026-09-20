@@ -1853,6 +1853,7 @@ body.calendar-dragging {
   border-radius: 8px;
   background: #fff;
   color: #1a2332;
+  font-family: "Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo", sans-serif;
   font: inherit;
   font-size: 0.84rem;
   line-height: 1.25;
@@ -1889,17 +1890,26 @@ body.calendar-dragging {
 
 .modal__quick-input[type="date"]::-webkit-datetime-edit {
   padding: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   line-height: 2.1rem;
+  text-align: center;
 }
 
 .modal__quick-input[type="date"]::-webkit-datetime-edit-fields-wrapper {
   display: flex;
   align-items: center;
+  justify-content: center;
   height: 100%;
+  width: 100%;
 }
 
 .modal__quick-input[type="date"]::-webkit-date-and-time-value {
   line-height: 2.1rem;
+  text-align: center;
+  width: 100%;
 }
 
 .modal__quick-input[type="date"]::-webkit-calendar-picker-indicator {
@@ -2495,11 +2505,14 @@ body.calendar-dragging {
   width: 100%;
   min-width: 0;
   margin: 0;
-  padding: 0 0.45rem;
+  padding-top: calc((var(--deliverable-row-h) - (1em * 1.2) - 2px) / 2);
+  padding-bottom: calc((var(--deliverable-row-h) - (1em * 1.2) - 2px) / 2);
+  padding-left: 0.45rem;
+  padding-right: 0.45rem;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: #ffffff;
-  line-height: calc(var(--deliverable-row-h) - 2px);
+  line-height: 1.2;
   resize: none;
   white-space: nowrap;
   overflow: hidden;
@@ -2601,12 +2614,15 @@ body.calendar-dragging {
   grid-area: name;
   width: 100%;
   min-width: 0;
-  padding: 0 0.45rem;
+  padding-top: calc((var(--deliverable-row-h) - (1em * 1.2) - 2px) / 2);
+  padding-bottom: calc((var(--deliverable-row-h) - (1em * 1.2) - 2px) / 2);
+  padding-left: 0.45rem;
+  padding-right: 0.45rem;
   border: 1px solid #cbd5e1;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.92);
   color: #1e293b;
-  line-height: calc(var(--deliverable-row-h) - 2px);
+  line-height: 1.2;
   resize: none;
   white-space: nowrap;
   overflow: hidden;
@@ -3210,6 +3226,12 @@ body.calendar-dragging {
     grid-template-columns: 5.2rem minmax(0, 1fr);
   }
 
+  .modal__quick-line--start .modal__quick-input,
+  .modal__quick-line--end .modal__quick-input {
+    font-size: 0.76rem;
+    letter-spacing: -0.015em;
+  }
+
   .modal__field--inline {
     grid-template-columns: 5.2rem minmax(0, 1fr);
   }
@@ -3234,7 +3256,8 @@ body.calendar-dragging {
   }
 
   .deliverable-editor__name {
-    padding: 0 0.32rem;
+    padding-left: 0.32rem;
+    padding-right: 0.32rem;
   }
 
   .deliverable-editor__add {
@@ -3247,7 +3270,8 @@ body.calendar-dragging {
 
 
   .deliverable-item__name-input {
-    padding: 0 0.32rem;
+    padding-left: 0.32rem;
+    padding-right: 0.32rem;
   }
 
   .deliverable-item__importance-select {
@@ -3608,7 +3632,8 @@ body.calendar-dragging {
   }
 
   .deliverable-editor__name {
-    padding: 0 0.24rem;
+    padding-left: 0.24rem;
+    padding-right: 0.24rem;
   }
 
   .deliverable-item {
@@ -3617,7 +3642,8 @@ body.calendar-dragging {
 
 
   .deliverable-item__name-input {
-    padding: 0 0.24rem;
+    padding-left: 0.24rem;
+    padding-right: 0.24rem;
   }
 
   .deliverable-item__importance-select {
