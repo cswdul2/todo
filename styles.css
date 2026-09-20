@@ -16,7 +16,7 @@
   --dot-ready: #8b95a5;
   --dot-ongoing: #e8943a;
   --dot-done: #43a047;
-  font-family: "Segoe UI", "Malgun Gothic", sans-serif;
+  font-family: "Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo", sans-serif;
 }
 
 *,
@@ -2316,6 +2316,8 @@ body.calendar-dragging {
   --deliverable-importance-col: 3.15rem;
   --deliverable-action-col: 2.95rem;
   --deliverable-row-h: 2.2rem;
+  --deliverable-font-size: 0.8rem;
+  --deliverable-font-weight: 600;
   --deliverable-cell-pad-x: 0.45rem;
   --deliverable-cell-pad-y: 0.35rem;
   display: grid;
@@ -2441,13 +2443,19 @@ body.calendar-dragging {
   box-sizing: border-box;
   height: var(--deliverable-row-h);
   min-height: var(--deliverable-row-h);
+  font-family: "Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo", sans-serif;
+  font-size: var(--deliverable-font-size);
+  font-weight: var(--deliverable-font-weight);
+  line-height: calc(var(--deliverable-row-h) - 2px);
+  vertical-align: middle;
 }
 
 .deliverable-editor__importance,
 .deliverable-item__importance-select {
   padding-top: 0;
   padding-bottom: 0;
-  line-height: calc(var(--deliverable-row-h) - 2px);
+  text-align: center;
+  text-align-last: center;
 }
 
 .deliverable-editor__importance {
@@ -2461,7 +2469,6 @@ body.calendar-dragging {
   border-radius: 8px;
   background: #fff;
   font: inherit;
-  font-size: 0.82rem;
 }
 
 .deliverable-editor__name {
@@ -2469,20 +2476,17 @@ body.calendar-dragging {
   width: 100%;
   min-width: 0;
   margin: 0;
-  padding: 0.32rem 0.5rem;
+  padding: 0 0.45rem;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: #ffffff;
-  font: inherit;
-  font-size: 0.82rem;
-  line-height: 1.25;
+  line-height: calc(var(--deliverable-row-h) - 2px);
   resize: none;
-  overflow-x: hidden;
-  overflow-wrap: anywhere;
-  word-wrap: break-word;
-  white-space: pre-wrap;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   box-sizing: border-box;
-  vertical-align: top;
+  vertical-align: middle;
 }
 
 .deliverable-editor__add {
@@ -2546,14 +2550,16 @@ body.calendar-dragging {
   color: #0f172a;
   -webkit-text-fill-color: #0f172a;
   color-scheme: light;
-  font: inherit;
-  font-size: 0.74rem;
   font-variant-numeric: tabular-nums;
-  line-height: calc(var(--deliverable-row-h) - 2px);
   box-sizing: border-box;
   appearance: none;
   -webkit-appearance: none;
   text-align: center;
+}
+
+.deliverable-item__completed-at::placeholder {
+  color: #94a3b8;
+  font-weight: 600;
 }
 
 .deliverable-item__completed-at::-webkit-datetime-edit {
@@ -2576,21 +2582,18 @@ body.calendar-dragging {
   grid-area: name;
   width: 100%;
   min-width: 0;
-  padding: 0.32rem 0.5rem;
+  padding: 0 0.45rem;
   border: 1px solid #cbd5e1;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.92);
   color: #1e293b;
-  font: inherit;
-  font-size: 0.82rem;
-  line-height: 1.25;
+  line-height: calc(var(--deliverable-row-h) - 2px);
   resize: none;
-  overflow-x: hidden;
-  overflow-wrap: anywhere;
-  word-wrap: break-word;
-  white-space: pre-wrap;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   box-sizing: border-box;
-  vertical-align: top;
+  vertical-align: middle;
 }
 
 .deliverable-item__importance-select {
@@ -2603,8 +2606,6 @@ body.calendar-dragging {
   border: 1px solid #cbd5e1;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.96);
-  font: inherit;
-  font-size: 0.82rem;
 }
 
 .deliverable-item__delete {
@@ -2620,10 +2621,7 @@ body.calendar-dragging {
   border-radius: 8px;
   background: #fff1f2;
   color: #991b1b;
-  font: inherit;
-  font-size: 0.74rem;
-  font-weight: 600;
-  line-height: 1;
+  line-height: calc(var(--deliverable-row-h) - 2px);
   white-space: nowrap;
   cursor: pointer;
 }
@@ -3202,6 +3200,7 @@ body.calendar-dragging {
     --deliverable-importance-col: 2.85rem;
     --deliverable-action-col: 2.55rem;
     --deliverable-row-h: 1.9rem;
+    --deliverable-font-size: 0.76rem;
     --deliverable-cell-pad-x: 0.3rem;
     --deliverable-cell-pad-y: 0.3rem;
   }
@@ -3211,15 +3210,12 @@ body.calendar-dragging {
   }
 
   .deliverable-editor__importance {
-    font-size: 0.8rem;
-    padding-left: 0.34rem;
-    padding-right: 0.34rem;
+    padding-left: 0.28rem;
+    padding-right: 0.28rem;
   }
 
   .deliverable-editor__name {
-    font-size: 0.8rem;
-    line-height: 1.25;
-    padding: 0.26rem 0.38rem;
+    padding: 0 0.32rem;
   }
 
   .deliverable-editor__add {
@@ -3232,18 +3228,15 @@ body.calendar-dragging {
 
 
   .deliverable-item__name-input {
-    font-size: 0.8rem;
-    padding: 0.26rem 0.38rem;
+    padding: 0 0.32rem;
   }
 
   .deliverable-item__importance-select {
-    font-size: 0.8rem;
-    padding-left: 0.34rem;
-    padding-right: 0.34rem;
+    padding-left: 0.28rem;
+    padding-right: 0.28rem;
   }
 
   .deliverable-item__delete {
-    font-size: 0.7rem;
     padding: 0 0.22rem;
   }
 }
@@ -3501,6 +3494,7 @@ body.calendar-dragging {
     --deliverable-importance-col: 2.6rem;
     --deliverable-action-col: 2.25rem;
     --deliverable-row-h: 1.72rem;
+    --deliverable-font-size: 0.72rem;
     --deliverable-cell-pad-x: 0.2rem;
     --deliverable-cell-pad-y: 0.2rem;
   }
@@ -3514,7 +3508,6 @@ body.calendar-dragging {
   }
 
   .deliverable-item__completed-at {
-    font-size: 0.7rem;
     text-align: center;
     padding-left: 0.16rem;
     padding-right: 0.16rem;
@@ -3577,6 +3570,7 @@ body.calendar-dragging {
     --deliverable-importance-col: 2.55rem;
     --deliverable-action-col: 2.2rem;
     --deliverable-row-h: 1.74rem;
+    --deliverable-font-size: 0.7rem;
     --deliverable-cell-pad-x: 0.22rem;
     --deliverable-cell-pad-y: 0.24rem;
   }
@@ -3586,7 +3580,6 @@ body.calendar-dragging {
   }
 
   .deliverable-editor__importance {
-    font-size: 0.72rem;
     padding-left: 0.2rem;
     padding-right: 0.2rem;
   }
@@ -3596,9 +3589,7 @@ body.calendar-dragging {
   }
 
   .deliverable-editor__name {
-    font-size: 0.77rem;
-    line-height: 1.25;
-    padding: 0.2rem 0.28rem;
+    padding: 0 0.24rem;
   }
 
   .deliverable-item {
@@ -3607,18 +3598,15 @@ body.calendar-dragging {
 
 
   .deliverable-item__name-input {
-    font-size: 0.77rem;
-    padding: 0.2rem 0.28rem;
+    padding: 0 0.24rem;
   }
 
   .deliverable-item__importance-select {
-    font-size: 0.72rem;
     padding-left: 0.2rem;
     padding-right: 0.2rem;
   }
 
   .deliverable-item__delete {
-    font-size: 0.64rem;
     padding: 0 0.18rem;
   }
 }

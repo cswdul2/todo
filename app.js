@@ -2347,7 +2347,7 @@
       dateInput.inputMode = "numeric";
       dateInput.autocomplete = "off";
       dateInput.maxLength = 10;
-      dateInput.placeholder = "YY.MM.DD";
+      dateInput.placeholder = "Doing";
       dateInput.title = "산출물 생산완료일자";
       dateInput.setAttribute("aria-label", "산출물 생산완료일자");
       const seedTaskStartDate = () => {
@@ -4353,7 +4353,7 @@
     if (location.protocol !== "http:" && location.protocol !== "https:") return;
     window.addEventListener("load", () => {
       navigator.serviceWorker
-        .register("sw.js?v=17")
+        .register("sw.js?v=18")
         .then((reg) => {
           reg.update().catch(() => {});
           if (reg.waiting) reg.waiting.postMessage({ type: "SKIP_WAITING" });
@@ -4363,8 +4363,8 @@
         });
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         // new SW took control — reload once so calendar layout code is fresh
-        if (sessionStorage.getItem("sw-reloaded-v17")) return;
-        sessionStorage.setItem("sw-reloaded-v17", "1");
+        if (sessionStorage.getItem("sw-reloaded-v18")) return;
+        sessionStorage.setItem("sw-reloaded-v18", "1");
         location.reload();
       });
     });
