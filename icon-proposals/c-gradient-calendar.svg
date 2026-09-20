@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="Concept C icon">
+  <defs>
+    <linearGradient id="bgC" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2f58ff" />
+      <stop offset="100%" stop-color="#2fd3c1" />
+    </linearGradient>
+  </defs>
+  <rect x="64" y="64" width="896" height="896" rx="200" fill="url(#bgC)" />
+  <rect x="250" y="268" width="524" height="420" rx="88" fill="none" stroke="#ffffff" stroke-width="42" />
+  <line x1="250" y1="392" x2="774" y2="392" stroke="#ffffff" stroke-width="38" />
+  <line x1="350" y1="224" x2="350" y2="304" stroke="#ffffff" stroke-width="34" stroke-linecap="round" />
+  <line x1="674" y1="224" x2="674" y2="304" stroke="#ffffff" stroke-width="34" stroke-linecap="round" />
+  <circle cx="390" cy="520" r="28" fill="#ffffff" />
+  <circle cx="512" cy="520" r="28" fill="#ffffff" />
+  <circle cx="634" cy="520" r="28" fill="#ffffff" />
+</svg>
