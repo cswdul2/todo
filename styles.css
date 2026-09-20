@@ -28,8 +28,13 @@
 body {
   margin: 0;
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--bg);
   color: var(--text);
+}
+
+body.body--overlay-open {
+  overflow: hidden;
 }
 
 .app {
@@ -1260,11 +1265,30 @@ body.calendar-dragging {
   position: fixed;
   inset: 0;
   z-index: 101;
+  --modal-vh: 100vh;
+  --modal-pad-top: max(0.75rem, calc(env(safe-area-inset-top) + 0.45rem));
+  --modal-pad-bottom: max(0.95rem, calc(env(safe-area-inset-bottom) + 0.65rem));
+  --modal-pad-inline: max(0.65rem, env(safe-area-inset-left), env(safe-area-inset-right));
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  padding: 1rem;
+  padding: var(--modal-pad-top) var(--modal-pad-inline) var(--modal-pad-bottom);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   pointer-events: none;
+}
+
+@supports (height: 100dvh) {
+  .modal {
+    --modal-vh: 100dvh;
+  }
+}
+
+@media (min-width: 901px) and (hover: hover) and (pointer: fine) {
+  .modal {
+    align-items: center;
+  }
 }
 
 .modal.modal--ocr {
@@ -1331,11 +1355,15 @@ body.calendar-dragging {
 
 .modal__inner {
   pointer-events: auto;
-  width: 92vw;
+  width: min(92vw, 560px);
   max-width: 560px;
-  max-height: min(90vh, 900px);
+  max-height: min(calc(var(--modal-vh) - var(--modal-pad-top) - var(--modal-pad-bottom)), 900px);
+  min-height: 0;
+  margin: 0 auto;
   overflow-y: auto;
   overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 14px;
@@ -1345,7 +1373,7 @@ body.calendar-dragging {
 
 .modal--ocr .modal__inner--ocr {
   max-width: min(640px, 96vw);
-  max-height: min(90vh, 900px);
+  max-height: min(calc(var(--modal-vh) - var(--modal-pad-top) - var(--modal-pad-bottom)), 900px);
   overflow-y: auto;
 }
 
@@ -3261,11 +3289,14 @@ body.calendar-dragging {
   }
 
   .modal {
-    padding: 0.55rem;
+    --modal-pad-top: max(0.55rem, calc(env(safe-area-inset-top) + 0.4rem));
+    --modal-pad-bottom: max(0.75rem, calc(env(safe-area-inset-bottom) + 0.6rem));
+    --modal-pad-inline: max(0.5rem, env(safe-area-inset-left), env(safe-area-inset-right));
+    padding: var(--modal-pad-top) var(--modal-pad-inline) var(--modal-pad-bottom);
   }
 
   .modal__inner {
-    width: 98vw;
+    width: min(96vw, 560px);
     border-radius: 12px;
     padding: 1rem 0.9rem 0.95rem;
   }

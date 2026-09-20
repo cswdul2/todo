@@ -1330,6 +1330,28 @@
     return getEditingTask()?.importance || draftImportance;
   }
 
+  function deriveStatusFromDeliverables(currentStatus, rows) {
+    const normalizedRows = Array.isArray(rows) ? rows : [];
+    if (!normalizedRows.length) return currentStatus;
+    const anyDone = normalizedRows.some((row) => isDeliverableComplete(row));
+    const allDone = anyDone && normalizedRows.every((row) => isDeliverableComplete(row));
+    if (allDone) return "done";
+    if (currentStatus === "done") return "on-going";
+    if (anyDone && currentStatus === "ready") return "on-going";
+    return currentStatus;
+  }
+
+  function isCoarsePointerDevice() {
+    return typeof window.matchMedia === "function" && window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+  }
+
+  function syncOverlayScrollLock() {
+    const modalOpen = taskModal instanceof HTMLElement && !taskModal.hidden;
+    const ocrOpen = ocrModal instanceof HTMLElement && !ocrModal.hidden;
+    const confirmOpen = confirmPop instanceof HTMLElement && !confirmPop.hidden;
+    document.body.classList.toggle("body--overlay-open", modalOpen || ocrOpen || confirmOpen);
+  }
+
   function canSetDoneStatusFromModal() {
     if (!deliverableList) return true;
     const dates = deliverableList.querySelectorAll(".deliverable-item__completed-at");
@@ -2794,8 +2816,9 @@
     refreshDeliverableHeaderUI();
     modalBackdrop.hidden = false;
     taskModal.hidden = false;
+    syncOverlayScrollLock();
     modalSessionSnapshot = buildModalSnapshot();
-    taskTitle.focus();
+    if (!isCoarsePointerDevice()) taskTitle.focus();
   }
 
   function renderExistingTasksList() {
@@ -2979,6 +3002,7 @@
       confirmCancel.hidden = !options.showCancel;
       confirmBackdrop.hidden = false;
       confirmPop.hidden = false;
+      syncOverlayScrollLock();
 
       const cleanup = () => {
         confirmBackdrop.hidden = true;
@@ -2986,6 +3010,7 @@
         confirmCancel.removeEventListener("click", onCancel);
         confirmOk.removeEventListener("click", onOk);
         confirmBackdrop.removeEventListener("click", onCancel);
+        syncOverlayScrollLock();
       };
       const onCancel = () => {
         cleanup();
@@ -3328,11 +3353,13 @@
     ocrPendingMime = "image/jpeg";
     ocrBackdrop.hidden = false;
     ocrModal.hidden = false;
+    syncOverlayScrollLock();
   }
 
   function closeOcrModal() {
     ocrBackdrop.hidden = true;
     ocrModal.hidden = true;
+    syncOverlayScrollLock();
   }
 
   function handleSelectedOcrFile(f) {
@@ -3374,13 +3401,14 @@
     editingId = null;
     btnDelete.hidden = true;
     modalSessionSnapshot = null;
+    syncOverlayScrollLock();
   }
 
   async function saveFromModal() {
     // 입력칸에 남아 있는 산출물도 저장 대상에 포함한다.
     commitDeliverableFromInputRow();
     const title = taskTitle.value.trim();
-    const status = getCurrentStatus();
+    const currentStatus = getCurrentStatus();
     const description = taskDescription.value.trim();
     const effortInputRaw = (taskEffortValue.value || "").trim();
     const effortRaw = Number(taskEffortValue.value);
@@ -3392,6 +3420,16 @@
     let recurrenceUntil = null;
     const importance = /** @type {'high'|'medium'|'low'} */ (getCurrentImportance());
     const deliverables = collectDeliverablesFromModal();
+    const status = deriveStatusFromDeliverables(currentStatus, deliverables);
+
+    if (editingId) {
+      const taskIndex = tasks.findIndex((x) => x.id === editingId);
+      if (taskIndex >= 0 && tasks[taskIndex].status !== status) {
+        tasks[taskIndex] = { ...tasks[taskIndex], status };
+      }
+    } else {
+      draftStatus = status;
+    }
 
     if (effortInputRaw === "") {
       await openAlertDialog("투입예상공수를 입력해 주세요.");
