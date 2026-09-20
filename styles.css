@@ -3496,28 +3496,28 @@ body.calendar-dragging {
     display: none;
   }
 
-  .deliverable-editor__head {
-    grid-template-columns: minmax(0, 1fr) var(--deliverable-importance-col) var(--deliverable-action-col);
-    grid-template-areas: "name imp act";
+  .deliverable-editor {
+    --deliverable-date-col: 5.45rem;
+    --deliverable-importance-col: 2.6rem;
+    --deliverable-action-col: 2.25rem;
+    --deliverable-row-h: 1.72rem;
+    --deliverable-cell-pad-x: 0.2rem;
+    --deliverable-cell-pad-y: 0.2rem;
   }
 
-  .deliverable-editor__spacer {
-    display: none;
+  .deliverable-editor__head {
+    gap: 0.24rem;
   }
 
   .deliverable-item {
-    grid-template-columns: minmax(0, 1fr) var(--deliverable-importance-col) var(--deliverable-action-col);
-    grid-template-areas:
-      "date date date"
-      "name imp act";
-    row-gap: 0.32rem;
+    gap: 0.24rem;
   }
 
   .deliverable-item__completed-at {
-    font-size: 0.82rem;
-    text-align: left;
-    padding-left: 0.4rem;
-    padding-right: 0.4rem;
+    font-size: 0.7rem;
+    text-align: center;
+    padding-left: 0.16rem;
+    padding-right: 0.16rem;
   }
 }
 
@@ -3573,9 +3573,9 @@ body.calendar-dragging {
   }
 
   .deliverable-editor {
-    --deliverable-date-col: 6.2rem;
-    --deliverable-importance-col: 2.6rem;
-    --deliverable-action-col: 2.3rem;
+    --deliverable-date-col: 5.2rem;
+    --deliverable-importance-col: 2.55rem;
+    --deliverable-action-col: 2.2rem;
     --deliverable-row-h: 1.74rem;
     --deliverable-cell-pad-x: 0.22rem;
     --deliverable-cell-pad-y: 0.24rem;

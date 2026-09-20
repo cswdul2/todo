@@ -758,9 +758,32 @@
 
   function normalizeCompletedAtDate(raw) {
     if (raw == null) return null;
-    const s = String(raw).trim().slice(0, 10);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
-    return s;
+    const s = String(raw).trim();
+    if (!s) return null;
+    const ymd = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+    if (ymd) {
+      const y = Number(ymd[1]);
+      const m = Number(ymd[2]);
+      const d = Number(ymd[3]);
+      if (m < 1 || m > 12 || d < 1 || d > 31) return null;
+      return `${y}-${pad2(m)}-${pad2(d)}`;
+    }
+    const short = s.match(/^(\d{2})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+    if (short) {
+      const y = 2000 + Number(short[1]);
+      const m = Number(short[2]);
+      const d = Number(short[3]);
+      if (m < 1 || m > 12 || d < 1 || d > 31) return null;
+      return `${y}-${pad2(m)}-${pad2(d)}`;
+    }
+    return null;
+  }
+
+  function formatDeliverableDateShort(isoDate) {
+    const normalized = normalizeCompletedAtDate(isoDate);
+    if (!normalized) return "";
+    const [y, m, d] = normalized.split("-");
+    return `${y.slice(2)}.${m}.${d}`;
   }
 
   /** 완료날짜가 있으면 그 날짜 기준으로 완료. 구버전 done만 있으면 전 기간 완료로 본다. */
@@ -1484,6 +1507,32 @@
       btn.classList.toggle("modal__quick-unit-btn--active", active);
       btn.setAttribute("aria-checked", active ? "true" : "false");
     });
+  }
+
+  function formatEffortInputValue(v) {
+    if (!Number.isFinite(v) || v <= 0) return "";
+    const rounded = Math.round(v * 10000) / 10000;
+    return String(rounded).replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1");
+  }
+
+  function setEffortUnit(nextUnitRaw) {
+    if (!taskEffortUnit || !taskEffortValue) return;
+    const nextUnit = nextUnitRaw === "MD" ? "MD" : "MH";
+    const prevUnit = taskEffortUnit.value === "MD" ? "MD" : "MH";
+    if (prevUnit === nextUnit) {
+      renderEffortUnitToggle();
+      updateActualEffortPreview();
+      return;
+    }
+    const raw = Number(taskEffortValue.value);
+    if (Number.isFinite(raw) && raw > 0) {
+      const mh = prevUnit === "MD" ? raw * 24 : raw;
+      const nextValue = nextUnit === "MD" ? mh / 24 : mh;
+      taskEffortValue.value = formatEffortInputValue(nextValue);
+    }
+    taskEffortUnit.value = nextUnit;
+    renderEffortUnitToggle();
+    updateActualEffortPreview();
   }
 
   function applyModalTheme() {
@@ -2292,9 +2341,13 @@
         li.setAttribute("data-created-at", String(Math.floor(Number(row.createdAt))));
       }
       const dateInput = document.createElement("input");
-      dateInput.type = "date";
+      dateInput.type = "text";
       dateInput.className = "deliverable-item__completed-at";
-      dateInput.value = completedAt || "";
+      dateInput.value = completedAt ? formatDeliverableDateShort(completedAt) : "";
+      dateInput.inputMode = "numeric";
+      dateInput.autocomplete = "off";
+      dateInput.maxLength = 10;
+      dateInput.placeholder = "YY.MM.DD";
       dateInput.title = "산출물 생산완료일자";
       dateInput.setAttribute("aria-label", "산출물 생산완료일자");
       const seedTaskStartDate = () => {
@@ -2304,10 +2357,16 @@
           getEditingTask()?.startDate ||
           selectedDateStr ||
           "";
-        if (start) dateInput.value = start;
+        if (start) dateInput.value = formatDeliverableDateShort(start);
+      };
+      const normalizeDateInputField = () => {
+        const normalized = normalizeCompletedAtDate(dateInput.value);
+        dateInput.value = normalized ? formatDeliverableDateShort(normalized) : "";
       };
       dateInput.addEventListener("pointerdown", seedTaskStartDate);
       dateInput.addEventListener("focus", seedTaskStartDate);
+      dateInput.addEventListener("blur", normalizeDateInputField);
+      dateInput.addEventListener("change", normalizeDateInputField);
 
       const nameTa = document.createElement("textarea");
       nameTa.className = "deliverable-item__name-input";
@@ -3885,18 +3944,13 @@
       const btn = e.target instanceof HTMLElement ? e.target.closest("button[data-unit]") : null;
       if (!(btn instanceof HTMLButtonElement)) return;
       const unit = btn.getAttribute("data-unit") === "MD" ? "MD" : "MH";
-      if (taskEffortUnit.value === unit) return;
-      taskEffortUnit.value = unit;
-      renderEffortUnitToggle();
-      updateActualEffortPreview();
+      setEffortUnit(unit);
     });
     taskEffortUnitToggle.addEventListener("keydown", (e) => {
       if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
       e.preventDefault();
       const nextUnit = taskEffortUnit.value === "MD" ? "MH" : "MD";
-      taskEffortUnit.value = nextUnit;
-      renderEffortUnitToggle();
-      updateActualEffortPreview();
+      setEffortUnit(nextUnit);
     });
   }
   if (btnDeliverableAddToggle) {
@@ -4299,7 +4353,7 @@
     if (location.protocol !== "http:" && location.protocol !== "https:") return;
     window.addEventListener("load", () => {
       navigator.serviceWorker
-        .register("sw.js?v=16")
+        .register("sw.js?v=17")
         .then((reg) => {
           reg.update().catch(() => {});
           if (reg.waiting) reg.waiting.postMessage({ type: "SKIP_WAITING" });
@@ -4309,8 +4363,8 @@
         });
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         // new SW took control — reload once so calendar layout code is fresh
-        if (sessionStorage.getItem("sw-reloaded-v16")) return;
-        sessionStorage.setItem("sw-reloaded-v16", "1");
+        if (sessionStorage.getItem("sw-reloaded-v17")) return;
+        sessionStorage.setItem("sw-reloaded-v17", "1");
         location.reload();
       });
     });

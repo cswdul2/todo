@@ -52,6 +52,20 @@ function taskSpentDailyMhOnDate(task, dateStr) {
   return spent;
 }
 
+function formatEffortInputValue(v) {
+  if (!Number.isFinite(v) || v <= 0) return "";
+  const rounded = Math.round(v * 10000) / 10000;
+  return String(rounded).replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1");
+}
+
+function convertEffortInputValue(valueRaw, fromUnit, toUnit) {
+  const raw = Number(valueRaw);
+  if (!Number.isFinite(raw) || raw <= 0 || fromUnit === toUnit) return String(valueRaw);
+  const mh = fromUnit === "MD" ? raw * 24 : raw;
+  const next = toUnit === "MD" ? mh / 24 : mh;
+  return formatEffortInputValue(next);
+}
+
 // 1MD = 24MH (total)
 {
   const mdTask = { effortValue: 1, effortUnit: "MD" };
@@ -89,6 +103,14 @@ function taskSpentDailyMhOnDate(task, dateStr) {
   const spent21 = taskSpentDailyMhOnDate(task, "2026-09-21");
   if (Math.abs(spent20 - 12) > 1e-9) throw new Error(`spent20 expected 12MH, got ${spent20}`);
   if (Math.abs(spent21 - 8) > 1e-9) throw new Error(`spent21 expected 8MH, got ${spent21}`);
+}
+
+// Unit switch should convert entered value while preserving MH amount
+{
+  const toMd = convertEffortInputValue("24", "MH", "MD");
+  const toMh = convertEffortInputValue("1", "MD", "MH");
+  if (toMd !== "1") throw new Error(`24MH -> MD expected 1, got ${toMd}`);
+  if (toMh !== "24") throw new Error(`1MD -> MH expected 24, got ${toMh}`);
 }
 
 console.log("PASS MD↔MH conversion checks");
