@@ -145,6 +145,7 @@
   let geminiKeyCache = "";
   let firebaseDb = null;
   let firebaseTasksRef = null;
+  let overlayLockScrollY = 0;
   let barDotLayoutFixAttempts = 0;
   let rangeTooltipEl = null;
   let rangeTooltipHideTimer = null;
@@ -1408,17 +1409,19 @@
 
   function normalizeViewportAfterOverlayClose() {
     if (!isCoarsePointerDevice()) return;
-    const active = document.activeElement;
-    if (
-      active instanceof HTMLElement &&
-      (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement || active instanceof HTMLSelectElement)
-    ) {
-      active.blur();
-    }
-    requestAnimationFrame(() => {
-      const y = window.scrollY || window.pageYOffset || 0;
-      if (window.scrollX !== 0) window.scrollTo(0, y);
+    document.querySelectorAll("input, textarea, select").forEach((el) => {
+      if (el instanceof HTMLElement && typeof el.blur === "function") el.blur();
     });
+    const resetX = () => {
+      const y = window.scrollY || window.pageYOffset || 0;
+      window.scrollTo(0, y);
+      document.documentElement.scrollLeft = 0;
+      document.body.scrollLeft = 0;
+    };
+    resetX();
+    requestAnimationFrame(resetX);
+    setTimeout(resetX, 120);
+    setTimeout(resetX, 320);
   }
 
   function syncOverlayScrollLock() {
@@ -1427,8 +1430,26 @@
     const confirmOpen = confirmPop instanceof HTMLElement && !confirmPop.hidden;
     const shouldLock = modalOpen || ocrOpen || confirmOpen;
     const wasLocked = document.body.classList.contains("body--overlay-open");
+    if (shouldLock && !wasLocked && isCoarsePointerDevice()) {
+      overlayLockScrollY = window.scrollY || window.pageYOffset || 0;
+      document.body.style.position = "fixed";
+      document.body.style.top = `-${overlayLockScrollY}px`;
+      document.body.style.left = "0";
+      document.body.style.right = "0";
+      document.body.style.width = "100%";
+    }
     document.body.classList.toggle("body--overlay-open", shouldLock);
-    if (wasLocked && !shouldLock) normalizeViewportAfterOverlayClose();
+    if (wasLocked && !shouldLock) {
+      if (isCoarsePointerDevice()) {
+        document.body.style.position = "";
+        document.body.style.top = "";
+        document.body.style.left = "";
+        document.body.style.right = "";
+        document.body.style.width = "";
+        window.scrollTo(0, overlayLockScrollY);
+      }
+      normalizeViewportAfterOverlayClose();
+    }
   }
 
   function canSetDoneStatusFromModal() {
@@ -4577,7 +4598,7 @@
     if (location.protocol !== "http:" && location.protocol !== "https:") return;
     window.addEventListener("load", () => {
       navigator.serviceWorker
-        .register("sw.js?v=26")
+        .register("sw.js?v=27")
         .then((reg) => {
           reg.update().catch(() => {});
           if (reg.waiting) reg.waiting.postMessage({ type: "SKIP_WAITING" });
@@ -4587,8 +4608,8 @@
         });
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         // new SW took control — reload once so calendar layout code is fresh
-        if (sessionStorage.getItem("sw-reloaded-v26")) return;
-        sessionStorage.setItem("sw-reloaded-v26", "1");
+        if (sessionStorage.getItem("sw-reloaded-v27")) return;
+        sessionStorage.setItem("sw-reloaded-v27", "1");
         location.reload();
       });
     });
