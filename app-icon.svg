@@ -1,13 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <rect width="512" height="512" rx="96" fill="#4a7fd4"/>
-  <rect x="88" y="120" width="336" height="304" rx="40" fill="#ffffff"/>
-  <rect x="88" y="120" width="336" height="76" rx="40" fill="#1e293b"/>
-  <rect x="88" y="168" width="336" height="28" fill="#1e293b"/>
-  <rect x="150" y="84" width="32" height="76" rx="16" fill="#1e293b"/>
-  <rect x="330" y="84" width="32" height="76" rx="16" fill="#1e293b"/>
-  <circle cx="168" cy="258" r="22" fill="#8b95a5"/>
-  <circle cx="256" cy="258" r="22" fill="#e8943a"/>
-  <circle cx="344" cy="258" r="22" fill="#43a047"/>
-  <rect x="140" y="316" width="232" height="24" rx="12" fill="#d1d9e3"/>
-  <rect x="140" y="360" width="152" height="24" rx="12" fill="#d1d9e3"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="일정앱 아이콘 A안">
+  <defs>
+    <linearGradient id="bgA" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1e2b43" />
+      <stop offset="100%" stop-color="#16243a" />
+    </linearGradient>
+  </defs>
+  <rect x="32" y="32" width="448" height="448" rx="100" fill="url(#bgA)" />
+  <rect x="124" y="136" width="264" height="236" rx="46" fill="none" stroke="#ffffff" stroke-width="22" />
+  <line x1="124" y1="204" x2="388" y2="204" stroke="#ffffff" stroke-width="20" />
+  <line x1="180" y1="116" x2="180" y2="161" stroke="#ffffff" stroke-width="20" stroke-linecap="round" />
+  <line x1="332" y1="116" x2="332" y2="161" stroke="#ffffff" stroke-width="20" stroke-linecap="round" />
+  <path d="M215 280 L253 318 L320 251" fill="none" stroke="#ffffff" stroke-width="23" stroke-linecap="round" stroke-linejoin="round" />
 </svg>
