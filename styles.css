@@ -1811,6 +1811,13 @@ body.calendar-dragging {
 .modal__quick-line--end { grid-area: end; }
 .modal__quick-line--status { grid-area: status; }
 
+.modal__quick-line--start .modal__quick-input,
+.modal__quick-line--end .modal__quick-input {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
 .modal__quick-status-row {
   display: flex;
   flex-wrap: wrap;
@@ -1866,9 +1873,18 @@ body.calendar-dragging {
 }
 
 .modal__quick-input[type="date"] {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
   padding-top: 0;
   padding-bottom: 0;
   line-height: 2.1rem;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .modal__quick-input[type="date"]::-webkit-datetime-edit {
@@ -1887,7 +1903,10 @@ body.calendar-dragging {
 }
 
 .modal__quick-input[type="date"]::-webkit-calendar-picker-indicator {
-  margin-right: 0.02rem;
+  display: none;
+  width: 0;
+  margin: 0;
+  padding: 0;
 }
 
 .modal__quick-effort {

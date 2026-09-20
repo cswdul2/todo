@@ -3658,6 +3658,48 @@
   let datePopDrag = null;
   /** 마우스 클릭 직후의 focus 로는 달력을 다시 열지 않는다(기본 달력과 충돌 방지). */
   let datePopFocusSuppressUntil = 0;
+  /** @type {number | null} */
+  let datePopTouchPointerId = null;
+
+  function beginDatePopDrag(anchorDateStr) {
+    datePopDrag = { anchor: anchorDateStr, hover: anchorDateStr };
+    requestAnimationFrame(() => {
+      if (datePopDrag) renderDatePop();
+    });
+  }
+
+  function updateDatePopDragHover(nextDateStr) {
+    if (!datePopDrag || !nextDateStr) return;
+    if (datePopDrag.hover === nextDateStr) return;
+    datePopDrag.hover = nextDateStr;
+    const hoverDate = parseDateStr(nextDateStr);
+    if (
+      !Number.isNaN(hoverDate.getTime()) &&
+      (hoverDate.getFullYear() !== datePopYear || hoverDate.getMonth() !== datePopMonth)
+    ) {
+      datePopYear = hoverDate.getFullYear();
+      datePopMonth = hoverDate.getMonth();
+    }
+    renderDatePop();
+  }
+
+  function updateDatePopDragHoverFromPoint(clientX, clientY) {
+    const target = document.elementFromPoint(clientX, clientY);
+    const day = target instanceof HTMLElement ? target.closest(".date-pop__day") : null;
+    if (!(day instanceof HTMLElement) || !day.dataset.date) return;
+    updateDatePopDragHover(day.dataset.date);
+  }
+
+  function finishDatePopDrag() {
+    if (!datePopDrag) return;
+    const { anchor, hover } = datePopDrag;
+    const from = anchor <= hover ? anchor : hover;
+    const to = anchor <= hover ? hover : anchor;
+    datePopDrag = null;
+    applyDatePopSelection(from, to);
+    // 이어서 수정 드래그할 수 있도록 팝업 유지
+    renderDatePop();
+  }
 
   function isDatePopOpen() {
     return !!datePopEl && !datePopEl.hidden;
@@ -3669,6 +3711,7 @@
       datePopCloseTimer = null;
     }
     datePopDrag = null;
+    datePopTouchPointerId = null;
     datePopField = null;
     if (datePopEl) datePopEl.hidden = true;
   }
@@ -3737,28 +3780,21 @@
         const day = e.target instanceof HTMLElement ? e.target.closest(".date-pop__day") : null;
         if (!(day instanceof HTMLElement) || !day.dataset.date) return;
         e.preventDefault();
-        datePopDrag = { anchor: day.dataset.date, hover: day.dataset.date };
-        // 이 이벤트가 문서까지 전파되는 동안 눌린 버튼이 사라지지 않도록 다음 프레임에 다시 그린다.
-        requestAnimationFrame(() => {
-          if (datePopDrag) renderDatePop();
-        });
+        beginDatePopDrag(day.dataset.date);
       });
       datePopGrid.addEventListener("mouseover", (e) => {
         if (!datePopDrag) return;
         const day = e.target instanceof HTMLElement ? e.target.closest(".date-pop__day") : null;
         if (!(day instanceof HTMLElement) || !day.dataset.date) return;
-        if (datePopDrag.hover === day.dataset.date) return;
-        datePopDrag.hover = day.dataset.date;
-        // 다음달(또는 이전달) 칸으로 드래그하면 해당 달로 뷰를 넘겨 연속 선택이 되게 한다
-        const hoverDate = parseDateStr(day.dataset.date);
-        if (
-          !Number.isNaN(hoverDate.getTime()) &&
-          (hoverDate.getFullYear() !== datePopYear || hoverDate.getMonth() !== datePopMonth)
-        ) {
-          datePopYear = hoverDate.getFullYear();
-          datePopMonth = hoverDate.getMonth();
-        }
-        renderDatePop();
+        updateDatePopDragHover(day.dataset.date);
+      });
+      datePopGrid.addEventListener("pointerdown", (e) => {
+        if (e.pointerType === "mouse") return;
+        const day = e.target instanceof HTMLElement ? e.target.closest(".date-pop__day") : null;
+        if (!(day instanceof HTMLElement) || !day.dataset.date) return;
+        e.preventDefault();
+        datePopTouchPointerId = e.pointerId;
+        beginDatePopDrag(day.dataset.date);
       });
     }
     return pop;
@@ -3881,6 +3917,12 @@
     if (!(input instanceof HTMLInputElement)) return;
     input.addEventListener("mouseenter", () => openDatePop(field));
     input.addEventListener("mouseleave", scheduleCloseDatePop);
+    input.addEventListener("pointerdown", (e) => {
+      if (e.pointerType === "mouse") return;
+      e.preventDefault();
+      datePopFocusSuppressUntil = Date.now() + 400;
+      openDatePop(field);
+    });
     // 커스텀 달력을 유지: 입력칸 클릭 시 네이티브 picker만 막고 팝업은 다시 연다
     input.addEventListener("mousedown", (e) => {
       e.preventDefault();
@@ -3894,17 +3936,41 @@
   });
 
   document.addEventListener("mouseup", () => {
-    if (!datePopDrag) return;
-    const { anchor, hover } = datePopDrag;
-    const from = anchor <= hover ? anchor : hover;
-    const to = anchor <= hover ? hover : anchor;
-    datePopDrag = null;
-    applyDatePopSelection(from, to);
-    // 이어서 수정 드래그할 수 있도록 팝업 유지
-    renderDatePop();
+    finishDatePopDrag();
+  });
+
+  document.addEventListener("pointermove", (e) => {
+    if (datePopTouchPointerId == null) return;
+    if (e.pointerId !== datePopTouchPointerId) return;
+    updateDatePopDragHoverFromPoint(e.clientX, e.clientY);
+  });
+
+  document.addEventListener("pointerup", (e) => {
+    if (datePopTouchPointerId == null) return;
+    if (e.pointerId !== datePopTouchPointerId) return;
+    datePopTouchPointerId = null;
+    finishDatePopDrag();
+  });
+
+  document.addEventListener("pointercancel", (e) => {
+    if (datePopTouchPointerId == null) return;
+    if (e.pointerId !== datePopTouchPointerId) return;
+    datePopTouchPointerId = null;
+    finishDatePopDrag();
   });
 
   document.addEventListener("mousedown", (e) => {
+    if (!isDatePopOpen()) return;
+    if (datePopDrag) return;
+    const target = e.target;
+    if (!(target instanceof HTMLElement)) return;
+    if (datePopEl && datePopEl.contains(target)) return;
+    if (target === taskStart || target === taskEnd) return;
+    closeDatePop();
+  });
+
+  document.addEventListener("pointerdown", (e) => {
+    if (e.pointerType === "mouse") return;
     if (!isDatePopOpen()) return;
     if (datePopDrag) return;
     const target = e.target;
@@ -4353,7 +4419,7 @@
     if (location.protocol !== "http:" && location.protocol !== "https:") return;
     window.addEventListener("load", () => {
       navigator.serviceWorker
-        .register("sw.js?v=18")
+        .register("sw.js?v=19")
         .then((reg) => {
           reg.update().catch(() => {});
           if (reg.waiting) reg.waiting.postMessage({ type: "SKIP_WAITING" });
@@ -4363,8 +4429,8 @@
         });
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         // new SW took control — reload once so calendar layout code is fresh
-        if (sessionStorage.getItem("sw-reloaded-v18")) return;
-        sessionStorage.setItem("sw-reloaded-v18", "1");
+        if (sessionStorage.getItem("sw-reloaded-v19")) return;
+        sessionStorage.setItem("sw-reloaded-v19", "1");
         location.reload();
       });
     });
