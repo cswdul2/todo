@@ -760,6 +760,19 @@
     if (raw == null) return null;
     const s = String(raw).trim();
     if (!s) return null;
+    const digitsOnly = s.replace(/\D/g, "");
+    if (/^\d{6}$/.test(digitsOnly)) {
+      const y = 2000 + Number(digitsOnly.slice(0, 2));
+      const m = Number(digitsOnly.slice(2, 4));
+      const d = Number(digitsOnly.slice(4, 6));
+      if (m >= 1 && m <= 12 && d >= 1 && d <= 31) return `${y}-${pad2(m)}-${pad2(d)}`;
+    }
+    if (/^\d{8}$/.test(digitsOnly)) {
+      const y = Number(digitsOnly.slice(0, 4));
+      const m = Number(digitsOnly.slice(4, 6));
+      const d = Number(digitsOnly.slice(6, 8));
+      if (m >= 1 && m <= 12 && d >= 1 && d <= 31) return `${y}-${pad2(m)}-${pad2(d)}`;
+    }
     const ymd = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
     if (ymd) {
       const y = Number(ymd[1]);
@@ -784,6 +797,15 @@
     if (!normalized) return "";
     const [y, m, d] = normalized.split("-");
     return `${y.slice(2)}.${m}.${d}`;
+  }
+
+  function normalizeDeliverableDateDisplay(raw) {
+    const digits = String(raw == null ? "" : raw).replace(/\D/g, "").slice(0, 8);
+    if (!digits) return "";
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 4) return `${digits.slice(0, 2)}.${digits.slice(2)}`;
+    if (digits.length <= 6) return `${digits.slice(0, 2)}.${digits.slice(2, 4)}.${digits.slice(4)}`;
+    return `${digits.slice(0, 4)}.${digits.slice(4, 6)}.${digits.slice(6, 8)}`;
   }
 
   /** 완료날짜가 있으면 그 날짜 기준으로 완료. 구버전 done만 있으면 전 기간 완료로 본다. */
@@ -2363,8 +2385,13 @@
         const normalized = normalizeCompletedAtDate(dateInput.value);
         dateInput.value = normalized ? formatDeliverableDateShort(normalized) : "";
       };
+      const normalizeDateInputDisplay = () => {
+        const next = normalizeDeliverableDateDisplay(dateInput.value);
+        if (dateInput.value !== next) dateInput.value = next;
+      };
       dateInput.addEventListener("pointerdown", seedTaskStartDate);
       dateInput.addEventListener("focus", seedTaskStartDate);
+      dateInput.addEventListener("input", normalizeDateInputDisplay);
       dateInput.addEventListener("blur", normalizeDateInputField);
       dateInput.addEventListener("change", normalizeDateInputField);
 
@@ -4419,7 +4446,7 @@
     if (location.protocol !== "http:" && location.protocol !== "https:") return;
     window.addEventListener("load", () => {
       navigator.serviceWorker
-        .register("sw.js?v=20")
+        .register("sw.js?v=21")
         .then((reg) => {
           reg.update().catch(() => {});
           if (reg.waiting) reg.waiting.postMessage({ type: "SKIP_WAITING" });
@@ -4429,8 +4456,8 @@
         });
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         // new SW took control — reload once so calendar layout code is fresh
-        if (sessionStorage.getItem("sw-reloaded-v20")) return;
-        sessionStorage.setItem("sw-reloaded-v20", "1");
+        if (sessionStorage.getItem("sw-reloaded-v21")) return;
+        sessionStorage.setItem("sw-reloaded-v21", "1");
         location.reload();
       });
     });

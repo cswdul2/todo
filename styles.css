@@ -2587,6 +2587,9 @@ body.calendar-dragging {
   appearance: none;
   -webkit-appearance: none;
   text-align: center;
+  font-feature-settings: "tnum" 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
 }
 
 .deliverable-item__completed-at::placeholder {
