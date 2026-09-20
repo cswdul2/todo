@@ -2389,7 +2389,21 @@
         const next = normalizeDeliverableDateDisplay(dateInput.value);
         if (dateInput.value !== next) dateInput.value = next;
       };
-      dateInput.addEventListener("pointerdown", seedTaskStartDate);
+      const openDeliverableDatePicker = () => {
+        seedTaskStartDate();
+        openDatePopForDeliverable(dateInput);
+      };
+      dateInput.addEventListener("pointerdown", (e) => {
+        if (e.pointerType === "mouse") return;
+        e.preventDefault();
+        datePopFocusSuppressUntil = Date.now() + 400;
+        openDeliverableDatePicker();
+      });
+      dateInput.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        datePopFocusSuppressUntil = Date.now() + 400;
+        openDeliverableDatePicker();
+      });
       dateInput.addEventListener("focus", seedTaskStartDate);
       dateInput.addEventListener("input", normalizeDateInputDisplay);
       dateInput.addEventListener("blur", normalizeDateInputField);
@@ -3675,7 +3689,7 @@
   let datePopGrid = null;
   /** @type {HTMLElement | null} */
   let datePopTitle = null;
-  /** @type {'start' | 'end' | null} */
+  /** @type {'start' | 'end' | 'deliverable' | null} */
   let datePopField = null;
   let datePopYear = 0;
   let datePopMonth = 0;
@@ -3687,6 +3701,8 @@
   let datePopFocusSuppressUntil = 0;
   /** @type {number | null} */
   let datePopTouchPointerId = null;
+  /** @type {HTMLInputElement | null} */
+  let datePopDeliverableInput = null;
 
   function beginDatePopDrag(anchorDateStr) {
     datePopDrag = { anchor: anchorDateStr, hover: anchorDateStr };
@@ -3723,7 +3739,9 @@
     const from = anchor <= hover ? anchor : hover;
     const to = anchor <= hover ? hover : anchor;
     datePopDrag = null;
+    const fromDeliverableField = datePopField === "deliverable";
     applyDatePopSelection(from, to);
+    if (fromDeliverableField) return;
     // 이어서 수정 드래그할 수 있도록 팝업 유지
     renderDatePop();
   }
@@ -3740,6 +3758,7 @@
     datePopDrag = null;
     datePopTouchPointerId = null;
     datePopField = null;
+    datePopDeliverableInput = null;
     if (datePopEl) datePopEl.hidden = true;
   }
 
@@ -3849,8 +3868,14 @@
     if (!datePopEl || !datePopGrid) return;
     if (datePopTitle) datePopTitle.textContent = `${datePopYear}년 ${datePopMonth + 1}월`;
 
-    const startStr = taskStart.value || "";
-    const endStr = taskEnd.value || "";
+    const startStr =
+      datePopField === "deliverable" && datePopDeliverableInput
+        ? normalizeCompletedAtDate(datePopDeliverableInput.value) || ""
+        : taskStart.value || "";
+    const endStr =
+      datePopField === "deliverable" && datePopDeliverableInput
+        ? normalizeCompletedAtDate(datePopDeliverableInput.value) || ""
+        : taskEnd.value || "";
     let rangeFrom = startStr;
     let rangeTo = endStr;
     if (datePopDrag) {
@@ -3902,6 +3927,16 @@
 
   /** 달력에서 고른 값을 입력칸에 반영한다. */
   function applyDatePopSelection(from, to) {
+    if (datePopField === "deliverable") {
+      const picked = to || from;
+      if (datePopDeliverableInput instanceof HTMLInputElement) {
+        datePopDeliverableInput.value = formatDeliverableDateShort(picked);
+        datePopDeliverableInput.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+      closeDatePop();
+      return;
+    }
+
     const single = !to || from === to;
     if (single) {
       if (datePopField === "end") taskEnd.value = from;
@@ -3918,6 +3953,26 @@
     taskEnd.dispatchEvent(new Event("change", { bubbles: true }));
   }
 
+  function openDatePopForDeliverable(inputEl) {
+    if (!(inputEl instanceof HTMLInputElement)) return;
+    if (taskModal.hidden) return;
+    ensureDatePop();
+    if (!datePopEl) return;
+    cancelCloseDatePop();
+    datePopField = "deliverable";
+    datePopDeliverableInput = inputEl;
+    const normalized = normalizeCompletedAtDate(inputEl.value);
+    const fallback = taskStart.value || toDateStrFromDate(new Date());
+    const base = parseDateStr(normalized || fallback);
+    const anchorDate = Number.isNaN(base.getTime()) ? new Date() : base;
+    datePopYear = anchorDate.getFullYear();
+    datePopMonth = anchorDate.getMonth();
+    datePopDrag = null;
+    datePopEl.hidden = false;
+    renderDatePop();
+    positionDatePop(inputEl);
+  }
+
   /** @param {'start'|'end'} field */
   function openDatePop(field) {
     const input = field === "end" ? taskEnd : taskStart;
@@ -3927,6 +3982,7 @@
     if (!datePopEl) return;
     cancelCloseDatePop();
     datePopField = field;
+    datePopDeliverableInput = null;
     const base = parseDateStr(input.value || taskStart.value || toDateStrFromDate(new Date()));
     const anchorDate = Number.isNaN(base.getTime()) ? new Date() : base;
     datePopYear = anchorDate.getFullYear();
@@ -3992,6 +4048,7 @@
     const target = e.target;
     if (!(target instanceof HTMLElement)) return;
     if (datePopEl && datePopEl.contains(target)) return;
+    if (target.closest(".deliverable-item__completed-at")) return;
     if (target === taskStart || target === taskEnd) return;
     closeDatePop();
   });
@@ -4003,6 +4060,7 @@
     const target = e.target;
     if (!(target instanceof HTMLElement)) return;
     if (datePopEl && datePopEl.contains(target)) return;
+    if (target.closest(".deliverable-item__completed-at")) return;
     if (target === taskStart || target === taskEnd) return;
     closeDatePop();
   });
@@ -4446,7 +4504,7 @@
     if (location.protocol !== "http:" && location.protocol !== "https:") return;
     window.addEventListener("load", () => {
       navigator.serviceWorker
-        .register("sw.js?v=21")
+        .register("sw.js?v=22")
         .then((reg) => {
           reg.update().catch(() => {});
           if (reg.waiting) reg.waiting.postMessage({ type: "SKIP_WAITING" });
@@ -4456,8 +4514,8 @@
         });
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         // new SW took control — reload once so calendar layout code is fresh
-        if (sessionStorage.getItem("sw-reloaded-v21")) return;
-        sessionStorage.setItem("sw-reloaded-v21", "1");
+        if (sessionStorage.getItem("sw-reloaded-v22")) return;
+        sessionStorage.setItem("sw-reloaded-v22", "1");
         location.reload();
       });
     });
