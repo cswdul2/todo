@@ -1826,7 +1826,8 @@ body.calendar-dragging {
   display: grid;
   grid-template-columns: 1fr 1fr;
   grid-template-areas:
-    "imp effort"
+    "imp imp"
+    "effort effort"
     "actual actual"
     "start end"
     "status status";
