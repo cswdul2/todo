@@ -1539,6 +1539,13 @@
     return Array.from(dates).every((el) => el instanceof HTMLInputElement && !!normalizeCompletedAtDate(el.value));
   }
 
+  function canSetDoneStatusForTaskOnDate(task, dateStr) {
+    if (!task) return false;
+    const rows = getModalDeliverablesForDate(task, dateStr || task.startDate || null);
+    if (!rows.length) return true;
+    return rows.every((row) => isDeliverableComplete(row));
+  }
+
   async function enforceDoneStatusConstraint() {
     if (canSetDoneStatusFromModal()) return;
     const current = getCurrentStatus();
@@ -3143,6 +3150,11 @@
           e.stopPropagation();
           const i = tasks.findIndex((x) => x.id === t.id);
           if (i < 0) return;
+          if (st === "done" && !canSetDoneStatusForTaskOnDate(tasks[i], selectedDateStr)) {
+            showStatusBlockHint(q, "변경불가◀️예상산출물 미완료상태");
+            return;
+          }
+          hideStatusBlockHint();
           pushUndoSnapshot();
           tasks[i] = { ...tasks[i], status: st };
           if (editingId === t.id) modalDefaultWhite = false;
@@ -4684,7 +4696,7 @@
     if (location.protocol !== "http:" && location.protocol !== "https:") return;
     window.addEventListener("load", () => {
       navigator.serviceWorker
-        .register("sw.js?v=32")
+        .register("sw.js?v=33")
         .then((reg) => {
           reg.update().catch(() => {});
           if (reg.waiting) reg.waiting.postMessage({ type: "SKIP_WAITING" });
@@ -4694,8 +4706,8 @@
         });
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         // new SW took control — reload once so calendar layout code is fresh
-        if (sessionStorage.getItem("sw-reloaded-v32")) return;
-        sessionStorage.setItem("sw-reloaded-v32", "1");
+        if (sessionStorage.getItem("sw-reloaded-v33")) return;
+        sessionStorage.setItem("sw-reloaded-v33", "1");
         location.reload();
       });
     });
