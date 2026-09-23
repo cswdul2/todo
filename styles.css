@@ -1694,16 +1694,39 @@ body.calendar-dragging {
 .modal__topbar-text {
   min-width: 0;
   flex: 1 1 auto;
+  display: flex;
+  align-items: center;
 }
 
 /* 제목·날짜: 어색한 한글 줄바꿈 방지, 좁을 때 말줄임 */
 .modal__topbar .modal__title {
-  margin: 0 0 0.22rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
   word-break: keep-all;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   line-height: 1.25;
+  min-width: 0;
+}
+
+.modal__title-icon {
+  flex: 0 0 auto;
+  width: 1.75rem;
+  height: 1.75rem;
+  display: block;
+  object-fit: contain;
+  border-radius: 6px;
+}
+
+.modal__title-date {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
 }
 
 .modal__topbar .modal__hint {
@@ -1750,27 +1773,7 @@ body.calendar-dragging {
 }
 
 .modal__today-pill {
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-start;
-  flex: 0 0 auto;
-  width: auto;
-  min-width: 0;
-  max-width: min(9.75rem, 100%);
-  margin: 0;
-  box-sizing: border-box;
-  height: var(--modal-topbar-control-h);
-  min-height: var(--modal-topbar-control-h);
-  padding: 0 0.1rem;
-  border: none;
-  border-radius: 0;
-  background: transparent;
-  color: #334155;
-  font: inherit;
-  font-size: var(--modal-topbar-fs);
-  font-weight: 600;
-  line-height: 1.2;
-  white-space: nowrap;
+  display: none;
 }
 
 .modal__btn-new-top {
@@ -1798,7 +1801,7 @@ body.calendar-dragging {
 
 .modal__field--inline {
   display: grid;
-  grid-template-columns: 4.6rem minmax(0, 1fr);
+  grid-template-columns: 5.6rem minmax(0, 1fr);
   align-items: center;
   column-gap: 0.45rem;
 }
@@ -1808,9 +1811,11 @@ body.calendar-dragging {
   height: 2.2rem;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  text-align: center;
+  justify-content: flex-start;
+  text-align: left;
   white-space: nowrap;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 .modal__quick-meta {
@@ -1824,7 +1829,7 @@ body.calendar-dragging {
 
 .modal__quick-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   grid-template-areas:
     "imp imp"
     "effort actual"
@@ -1851,8 +1856,16 @@ body.calendar-dragging {
 .modal__quick-line--end { grid-area: end; }
 .modal__quick-line--status { grid-area: status; }
 
+.modal__quick-line--start,
+.modal__quick-line--end {
+  grid-template-columns: 4.6rem minmax(0, 1fr);
+}
+
 .modal__quick-line--start .modal__quick-input,
 .modal__quick-line--end .modal__quick-input {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   font-size: 0.8rem;
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -2057,8 +2070,19 @@ body.calendar-dragging {
   align-items: start;
 }
 
+.modal__quick-line--effort > .modal__quick-meta-label {
+  /* align to the control row (not the taller wrap that includes the unit hint) */
+  align-self: start;
+  height: 2.2rem;
+}
+
 .modal__quick-line--actual {
   align-items: start;
+}
+
+.modal__quick-line--actual > .modal__quick-meta-label {
+  align-self: start;
+  height: 2.2rem;
 }
 
 .modal__quick-meta-label {
@@ -2279,6 +2303,12 @@ body.calendar-dragging {
 .modal__quick-meta .modal__quick-line--effort,
 .modal__quick-meta .modal__quick-line--actual {
   align-items: start;
+}
+
+.modal__quick-meta .modal__quick-line--effort > .modal__quick-meta-label,
+.modal__quick-meta .modal__quick-line--actual > .modal__quick-meta-label {
+  align-self: start;
+  height: 2.2rem;
 }
 
 .modal__quick-meta .modal__quick-meta-label {
@@ -3179,6 +3209,15 @@ body.calendar-dragging {
   align-items: center;
   gap: 0.6rem;
   margin-left: auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.modal__btn-close-bottom {
+  flex-shrink: 0;
+  border-radius: 8px;
+  min-height: 2.2rem;
+  padding: 0.35rem 0.85rem;
 }
 
 .modal__actions-hint {
@@ -3349,7 +3388,7 @@ body.calendar-dragging {
   }
 
   .modal__field--inline {
-    grid-template-columns: 5.2rem minmax(0, 1fr);
+    grid-template-columns: 5.6rem minmax(0, 1fr);
   }
 
   .deliverable-editor {
@@ -3520,6 +3559,11 @@ body.calendar-dragging {
     font-size: 1rem;
   }
 
+  .modal__title-icon {
+    width: 1.55rem;
+    height: 1.55rem;
+  }
+
   .modal__topbar {
     flex-direction: column;
     align-items: stretch;
@@ -3543,6 +3587,15 @@ body.calendar-dragging {
 
   .modal__topbar .btn.modal__btn-close-top {
     width: 100%;
+  }
+
+  .modal__actions-right {
+    width: 100%;
+  }
+
+  .modal__btn-close-bottom {
+    width: auto;
+    min-width: 4.5rem;
   }
 
   .task-chip {

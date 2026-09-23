@@ -78,6 +78,7 @@
   const existingTasksList = document.getElementById("existingTasksList");
   const btnNewTask = document.getElementById("btnNewTask");
   const btnCloseModalTop = document.getElementById("btnCloseModalTop");
+  const btnCloseModalBottom = document.getElementById("btnCloseModalBottom");
   const btnExport = document.getElementById("btnExport");
   const btnImport = document.getElementById("btnImport");
   const importFileInput = document.getElementById("importFileInput");
@@ -748,8 +749,7 @@
 
   function updateTopbarDatePill() {
     if (!(modalTodayDisplay instanceof HTMLElement)) return;
-    const base = selectedDateStr || toDateStrFromDate(new Date());
-    modalTodayDisplay.textContent = base;
+    modalTodayDisplay.textContent = toDateStrFromDate(new Date());
   }
 
   /**
@@ -4635,6 +4635,7 @@
   // 모달 바깥 클릭 = 완료
   modalBackdrop.addEventListener("click", requestCloseTaskModal);
   if (btnCloseModalTop) btnCloseModalTop.addEventListener("click", requestCloseTaskModal);
+  if (btnCloseModalBottom) btnCloseModalBottom.addEventListener("click", requestCloseTaskModal);
 
   btnDelete.addEventListener("click", deleteTask);
 
@@ -4696,7 +4697,7 @@
     if (location.protocol !== "http:" && location.protocol !== "https:") return;
     window.addEventListener("load", () => {
       navigator.serviceWorker
-        .register("sw.js?v=35")
+        .register("sw.js?v=36")
         .then((reg) => {
           reg.update().catch(() => {});
           if (reg.waiting) reg.waiting.postMessage({ type: "SKIP_WAITING" });
@@ -4706,8 +4707,8 @@
         });
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         // new SW took control — reload once so calendar layout code is fresh
-        if (sessionStorage.getItem("sw-reloaded-v35")) return;
-        sessionStorage.setItem("sw-reloaded-v35", "1");
+        if (sessionStorage.getItem("sw-reloaded-v36")) return;
+        sessionStorage.setItem("sw-reloaded-v36", "1");
         location.reload();
       });
     });
