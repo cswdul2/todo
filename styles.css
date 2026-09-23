@@ -1801,21 +1801,54 @@ body.calendar-dragging {
 
 .modal__field--inline {
   display: grid;
-  grid-template-columns: 5.6rem minmax(0, 1fr);
+  grid-template-columns: minmax(7.5rem, max-content) minmax(0, 1fr);
   align-items: center;
-  column-gap: 0.45rem;
+  column-gap: 0.55rem;
 }
 
-.modal__field--inline > label {
+.modal__field--inline > label,
+.modal__task-register-label {
   margin: 0;
+  min-height: 2.2rem;
   height: 2.2rem;
   display: inline-flex;
   align-items: center;
-  justify-content: flex-start;
-  text-align: left;
+  justify-content: center;
+  gap: 0.35rem;
+  text-align: center;
   white-space: nowrap;
+  /* match modal title / date typography */
+  font-size: 1.15rem;
   font-weight: 700;
-  letter-spacing: -0.02em;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  color: #1a2332;
+}
+
+.modal__inner--default .modal__field--inline > .modal__task-register-label,
+.modal__inner--ready .modal__field--inline > .modal__task-register-label,
+.modal__inner--ongoing .modal__field--inline > .modal__task-register-label,
+.modal__inner--done .modal__field--inline > .modal__task-register-label {
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  color: #1a2332;
+  margin-bottom: 0;
+}
+
+.modal__task-register-icon {
+  flex: 0 0 auto;
+  font-size: 1.05rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal__task-register-text {
+  display: inline-block;
+  line-height: 1.25;
 }
 
 .modal__quick-meta {
@@ -1973,11 +2006,7 @@ body.calendar-dragging {
 }
 
 .modal__quick-effort-wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.18rem;
-  min-width: 0;
+  display: contents;
 }
 
 .modal__quick-effort {
@@ -2054,34 +2083,54 @@ body.calendar-dragging {
   display: none;
 }
 
-.modal__quick-unit-hint {
-  display: block;
-  margin: 0;
-  padding-left: 0.1rem;
-  font-size: 0.68rem;
-  font-weight: 600;
-  color: #64748b;
-  text-align: left;
-  line-height: 1.2;
+.modal__quick-effort-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.12rem;
+  min-width: 5.2rem;
+  text-align: center;
+}
+
+.modal__quick-effort-label .modal__quick-meta-label {
+  height: auto;
+  min-height: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
   white-space: nowrap;
 }
 
-.modal__quick-line--effort {
-  align-items: start;
+.modal__quick-unit-hint {
+  display: block;
+  margin: 0;
+  padding: 0;
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: #64748b;
+  text-align: center;
+  line-height: 1.2;
+  white-space: nowrap;
+  letter-spacing: -0.02em;
 }
 
-.modal__quick-line--effort > .modal__quick-meta-label {
-  /* align to the control row (not the taller wrap that includes the unit hint) */
-  align-self: start;
-  height: 2.2rem;
+.modal__quick-line--effort {
+  align-items: center;
+  grid-template-columns: max-content minmax(0, 1fr);
+}
+
+.modal__quick-line--effort > .modal__quick-effort-label {
+  align-self: center;
 }
 
 .modal__quick-line--actual {
-  align-items: start;
+  align-items: center;
 }
 
 .modal__quick-line--actual > .modal__quick-meta-label {
-  align-self: start;
+  align-self: center;
   height: 2.2rem;
 }
 
@@ -2302,12 +2351,20 @@ body.calendar-dragging {
 
 .modal__quick-meta .modal__quick-line--effort,
 .modal__quick-meta .modal__quick-line--actual {
-  align-items: start;
+  align-items: center;
 }
 
-.modal__quick-meta .modal__quick-line--effort > .modal__quick-meta-label,
+.modal__quick-meta .modal__quick-line--effort > .modal__quick-effort-label {
+  align-self: center;
+}
+
+.modal__quick-meta .modal__quick-line--effort .modal__quick-meta-label {
+  height: auto;
+  min-height: 0;
+}
+
 .modal__quick-meta .modal__quick-line--actual > .modal__quick-meta-label {
-  align-self: start;
+  align-self: center;
   height: 2.2rem;
 }
 
@@ -3388,7 +3445,7 @@ body.calendar-dragging {
   }
 
   .modal__field--inline {
-    grid-template-columns: 5.6rem minmax(0, 1fr);
+    grid-template-columns: minmax(7.2rem, max-content) minmax(0, 1fr);
   }
 
   .deliverable-editor {

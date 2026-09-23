@@ -6,15 +6,15 @@
   <title>일정 관리 — 월 달력</title>
   <meta name="description" content="월 달력으로 할일을 관리하고 사진에서 일정을 인식해 등록하는 앱" />
   <meta name="theme-color" content="#4a7fd4" />
-  <link rel="manifest" href="manifest.webmanifest?v=36" />
-  <link rel="icon" href="app-icon.svg?v=36" type="image/svg+xml" />
-  <link rel="icon" href="icon-192.png?v=36" type="image/png" sizes="192x192" />
-  <link rel="apple-touch-icon" href="apple-touch-icon.png?v=36" sizes="180x180" />
+  <link rel="manifest" href="manifest.webmanifest?v=37" />
+  <link rel="icon" href="app-icon.svg?v=37" type="image/svg+xml" />
+  <link rel="icon" href="icon-192.png?v=37" type="image/png" sizes="192x192" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png?v=37" sizes="180x180" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="일정 관리" />
-  <link rel="stylesheet" href="styles.css?v=36" />
+  <link rel="stylesheet" href="styles.css?v=37" />
 </head>
 <body>
   <div class="app">
@@ -116,7 +116,7 @@
       <div class="modal__topbar">
         <div class="modal__topbar-text">
           <h2 class="modal__title" id="modalTitle">
-            <img class="modal__title-icon" src="app-icon.svg?v=36" alt="" width="28" height="28" decoding="async" />
+            <img class="modal__title-icon" src="app-icon.svg?v=37" alt="" width="28" height="28" decoding="async" />
             <span class="modal__title-date" id="modalTodayDisplay" aria-live="polite"></span>
           </h2>
           <p class="modal__hint" id="modalDateHint"></p>
@@ -136,7 +136,10 @@
       </div>
 
       <div class="modal__field modal__field--inline">
-        <label for="taskTitle">Task 등록</label>
+        <label for="taskTitle" class="modal__task-register-label">
+          <span class="modal__task-register-icon" aria-hidden="true">📝</span>
+          <span class="modal__task-register-text">Task 등록</span>
+        </label>
         <input type="text" id="taskTitle" name="title" placeholder="일정 제목" />
       </div>
       <div class="modal__field modal__quick-meta" id="modalQuickMeta">
@@ -150,20 +153,20 @@
             </div>
           </div>
           <div class="modal__quick-line modal__quick-line--effort">
-            <label class="modal__quick-meta-label" for="taskEffortValue">투입예상공수</label>
-            <div class="modal__quick-effort-wrap">
-              <div class="modal__quick-effort">
-                <input type="number" id="taskEffortValue" name="effortValue" min="0" max="999" step="1" inputmode="numeric" placeholder="24" class="modal__quick-input modal__quick-input--effort-num" />
-                <div id="taskEffortUnitToggle" class="modal__quick-unit-toggle" role="radiogroup" aria-label="투입예상공수 단위 (1MD = 24MH)">
-                  <button type="button" class="modal__quick-unit-btn" data-unit="MH" role="radio" aria-checked="true">MH</button>
-                  <button type="button" class="modal__quick-unit-btn" data-unit="MD" role="radio" aria-checked="false">MD</button>
-                </div>
-                <select id="taskEffortUnit" name="effortUnit" class="modal__quick-input modal__quick-unit modal__quick-unit--native" aria-hidden="true" tabindex="-1">
-                  <option value="MH">MH</option>
-                  <option value="MD">MD</option>
-                </select>
+            <div class="modal__quick-effort-label">
+              <label class="modal__quick-meta-label" for="taskEffortValue">투입예상공수</label>
+              <span class="modal__quick-unit-hint" aria-hidden="true">(1MD=24MH)</span>
+            </div>
+            <div class="modal__quick-effort">
+              <input type="number" id="taskEffortValue" name="effortValue" min="0" max="999" step="1" inputmode="numeric" placeholder="24" class="modal__quick-input modal__quick-input--effort-num" />
+              <div id="taskEffortUnitToggle" class="modal__quick-unit-toggle" role="radiogroup" aria-label="투입예상공수 단위 (1MD = 24MH)">
+                <button type="button" class="modal__quick-unit-btn" data-unit="MH" role="radio" aria-checked="true">MH</button>
+                <button type="button" class="modal__quick-unit-btn" data-unit="MD" role="radio" aria-checked="false">MD</button>
               </div>
-              <span class="modal__quick-unit-hint" aria-hidden="true">1MD = 24MH</span>
+              <select id="taskEffortUnit" name="effortUnit" class="modal__quick-input modal__quick-unit modal__quick-unit--native" aria-hidden="true" tabindex="-1">
+                <option value="MH">MH</option>
+                <option value="MD">MD</option>
+              </select>
             </div>
           </div>
           <div class="modal__quick-line modal__quick-line--actual">
@@ -302,6 +305,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
-  <script src="app.js?v=36"></script>
+  <script src="app.js?v=37"></script>
 </body>
 </html>
