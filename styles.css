@@ -1824,11 +1824,10 @@ body.calendar-dragging {
 
 .modal__quick-layout {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1.9fr) minmax(0, 1fr);
   grid-template-areas:
     "imp imp"
-    "effort effort"
-    "actual actual"
+    "effort actual"
     "start end"
     "status status";
   gap: 0.6rem 0.9rem;
@@ -2019,22 +2018,13 @@ body.calendar-dragging {
 .modal__quick-unit-hint {
   display: block;
   margin-top: 0.2rem;
-  font-size: 0.66rem;
+  font-size: 0.68rem;
   font-weight: 600;
   color: #64748b;
   text-align: right;
 }
 
-@media (min-width: 900px) and (hover: hover) and (pointer: fine) {
-  .modal__quick-layout {
-    grid-template-columns: minmax(0, 1.9fr) minmax(0, 1fr);
-    grid-template-areas:
-      "imp imp"
-      "effort actual"
-      "start end"
-      "status status";
-  }
-
+@media (min-width: 900px) {
   .modal__quick-effort .modal__quick-input:first-child {
     min-width: 9.5rem;
   }
