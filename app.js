@@ -2580,6 +2580,8 @@
     const effortUnit = taskEffortUnit.value === "MD" ? "MD" : "MH";
     if (!Number.isFinite(effortRaw) || effortRaw <= 0) {
       taskActualEffortValue.value = `0${effortUnit}`;
+      renderQuickMetaControls();
+      void applyDerivedStatusFromModalDeliverables();
       return;
     }
     const expectedMh = effortUnit === "MD" ? effortRaw * 24 : effortRaw;
@@ -2591,9 +2593,7 @@
     const viewValue = effortUnit === "MD" ? actualMh / 24 : actualMh;
     taskActualEffortValue.value = `${formatMh(viewValue)}${effortUnit}`;
     renderQuickMetaControls();
-    void enforceDoneStatusConstraint();
-    void autoPromoteOngoingWhenStarted();
-    void autoPromoteDoneStatusWhenEligible();
+    void applyDerivedStatusFromModalDeliverables();
   }
 
   function cloneTasks(src) {
@@ -4711,7 +4711,7 @@
     if (location.protocol !== "http:" && location.protocol !== "https:") return;
     window.addEventListener("load", () => {
       navigator.serviceWorker
-        .register("sw.js?v=40")
+        .register("sw.js?v=41")
         .then((reg) => {
           reg.update().catch(() => {});
           if (reg.waiting) reg.waiting.postMessage({ type: "SKIP_WAITING" });
@@ -4721,8 +4721,8 @@
         });
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         // new SW took control — reload once so calendar layout code is fresh
-        if (sessionStorage.getItem("sw-reloaded-v40")) return;
-        sessionStorage.setItem("sw-reloaded-v40", "1");
+        if (sessionStorage.getItem("sw-reloaded-v41")) return;
+        sessionStorage.setItem("sw-reloaded-v41", "1");
         location.reload();
       });
     });
