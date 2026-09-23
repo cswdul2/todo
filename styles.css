@@ -512,20 +512,20 @@ body.body--overlay-open {
 }
 
 .imp-shape--high {
-  width: 15px;
-  height: 15px;
+  width: 18px;
+  height: 18px;
   clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
 }
 
 .imp-shape--medium {
-  width: 9px;
-  height: 9px;
+  width: 7px;
+  height: 7px;
   clip-path: polygon(50% 4%, 4% 96%, 96% 96%);
 }
 
 .imp-shape--low {
-  width: 8px;
-  height: 8px;
+  width: 4px;
+  height: 4px;
   border-radius: 50%;
 }
 
@@ -922,18 +922,18 @@ body.calendar-dragging {
 }
 
 .calendar-cell__dot-wrap--high {
-  width: 17px;
-  height: 17px;
+  width: 20px;
+  height: 20px;
 }
 
 .calendar-cell__dot-wrap--medium {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
 }
 
 .calendar-cell__dot-wrap--low {
-  width: 11px;
-  height: 11px;
+  width: 8px;
+  height: 8px;
 }
 
 /* 달력 점: 모양=중요도, 채움색=진행상태 */
@@ -946,20 +946,20 @@ body.calendar-dragging {
 }
 
 .calendar-cell__dot-mark--star {
-  width: 15px;
-  height: 15px;
+  width: 18px;
+  height: 18px;
   clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
 }
 
 .calendar-cell__dot-mark--triangle {
-  width: 9px;
-  height: 9px;
+  width: 7px;
+  height: 7px;
   clip-path: polygon(50% 4%, 4% 96%, 96% 96%);
 }
 
 .calendar-cell__dot-mark--circle {
-  width: 8px;
-  height: 8px;
+  width: 4px;
+  height: 4px;
   border-radius: 50%;
 }
 
@@ -3766,33 +3766,33 @@ body.calendar-dragging {
   }
 
   .calendar-cell__dot-wrap--high {
-    width: 15px;
-    height: 15px;
+    width: 17px;
+    height: 17px;
   }
 
   .calendar-cell__dot-wrap--medium {
-    width: 10px;
-    height: 10px;
+    width: 8px;
+    height: 8px;
   }
 
   .calendar-cell__dot-wrap--low {
-    width: 9px;
-    height: 9px;
-  }
-
-  .calendar-cell__dot-mark--star {
-    width: 13px;
-    height: 13px;
-  }
-
-  .calendar-cell__dot-mark--triangle {
     width: 7px;
     height: 7px;
   }
 
+  .calendar-cell__dot-mark--star {
+    width: 15px;
+    height: 15px;
+  }
+
+  .calendar-cell__dot-mark--triangle {
+    width: 5px;
+    height: 5px;
+  }
+
   .calendar-cell__dot-mark--circle {
-    width: 6px;
-    height: 6px;
+    width: 3px;
+    height: 3px;
   }
 
   .task-chip__status {
