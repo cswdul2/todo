@@ -156,6 +156,10 @@
   let rangeTooltipHovering = false;
   let rangeTooltipTransitUntil = 0;
   let rangeTooltipGlobalGuardBound = false;
+  let statusBlockHintEl = null;
+  let statusBlockHintHideTimer = null;
+  let statusBlockHintDismissHandler = null;
+  let statusBlockHintAnchorEl = null;
   let lastPointerClientX = -1;
   let lastPointerClientY = -1;
   let suppressRangeClickTaskId = null;
@@ -166,6 +170,82 @@
   let recurrenceWatchTimer = null;
   // 이전 실행에서 남아있을 수 있는 커스텀 툴팁 노드 정리
   document.querySelectorAll(".range-line-tooltip").forEach((el) => el.remove());
+  document.querySelectorAll(".status-block-hint").forEach((el) => el.remove());
+
+  function ensureStatusBlockHint() {
+    if (statusBlockHintEl && document.body.contains(statusBlockHintEl)) return statusBlockHintEl;
+    const existing = document.querySelector(".status-block-hint");
+    if (existing instanceof HTMLElement) {
+      statusBlockHintEl = existing;
+      return statusBlockHintEl;
+    }
+    const hint = document.createElement("div");
+    hint.className = "status-block-hint";
+    hint.hidden = true;
+    hint.setAttribute("role", "status");
+    hint.setAttribute("aria-live", "polite");
+    document.body.appendChild(hint);
+    statusBlockHintEl = hint;
+    return hint;
+  }
+
+  function hideStatusBlockHint() {
+    if (statusBlockHintHideTimer) {
+      clearTimeout(statusBlockHintHideTimer);
+      statusBlockHintHideTimer = null;
+    }
+    if (statusBlockHintDismissHandler) {
+      document.removeEventListener("mousedown", statusBlockHintDismissHandler, true);
+      document.removeEventListener("touchstart", statusBlockHintDismissHandler, true);
+      statusBlockHintDismissHandler = null;
+    }
+    statusBlockHintAnchorEl = null;
+    if (!statusBlockHintEl) return;
+    statusBlockHintEl.hidden = true;
+    statusBlockHintEl.classList.remove("status-block-hint--show");
+  }
+
+  function showStatusBlockHint(anchorEl, message) {
+    if (!(anchorEl instanceof HTMLElement)) return;
+    const hint = ensureStatusBlockHint();
+    hint.textContent = message;
+    hint.hidden = false;
+    hint.classList.add("status-block-hint--show");
+    statusBlockHintAnchorEl = anchorEl;
+    const anchorRect = anchorEl.getBoundingClientRect();
+    const hintRect = hint.getBoundingClientRect();
+    const pad = 8;
+    let left = anchorRect.left + anchorRect.width / 2 - hintRect.width / 2;
+    left = Math.max(pad, Math.min(window.innerWidth - hintRect.width - pad, left));
+    let top = anchorRect.bottom + 8;
+    if (top + hintRect.height > window.innerHeight - pad) {
+      top = Math.max(pad, anchorRect.top - hintRect.height - 8);
+    }
+    hint.style.left = `${Math.round(left)}px`;
+    hint.style.top = `${Math.round(top)}px`;
+
+    if (statusBlockHintHideTimer) clearTimeout(statusBlockHintHideTimer);
+    statusBlockHintHideTimer = setTimeout(() => {
+      hideStatusBlockHint();
+      statusBlockHintHideTimer = null;
+    }, 2000);
+    if (statusBlockHintDismissHandler) {
+      document.removeEventListener("mousedown", statusBlockHintDismissHandler, true);
+      document.removeEventListener("touchstart", statusBlockHintDismissHandler, true);
+    }
+    statusBlockHintDismissHandler = (evt) => {
+      const target = evt.target;
+      if (!(target instanceof Node)) {
+        hideStatusBlockHint();
+        return;
+      }
+      if (hint.contains(target)) return;
+      if (statusBlockHintAnchorEl instanceof HTMLElement && statusBlockHintAnchorEl.contains(target)) return;
+      hideStatusBlockHint();
+    };
+    document.addEventListener("mousedown", statusBlockHintDismissHandler, true);
+    document.addEventListener("touchstart", statusBlockHintDismissHandler, true);
+  }
 
   function pad2(n) {
     return String(n).padStart(2, "0");
@@ -1542,7 +1622,7 @@
         const isDoneBtn = btn.getAttribute("data-status") === "done";
         const disabledDone = isDoneBtn && !canDone;
         const active = !disabledDone && btn.getAttribute("data-status") === status;
-        btn.toggleAttribute("disabled", disabledDone);
+        btn.disabled = false;
         btn.setAttribute("aria-disabled", disabledDone ? "true" : "false");
         btn.classList.toggle("modal__quick-btn--disabled-done", disabledDone);
         btn.classList.toggle("modal__quick-btn--active", active);
@@ -3555,6 +3635,7 @@
   }
 
   function closeModal() {
+    hideStatusBlockHint();
     closeDatePop();
     modalBackdrop.hidden = true;
     taskModal.hidden = true;
@@ -4262,7 +4343,11 @@
     quickStatusGroup.addEventListener("click", async (e) => {
       const btn = e.target instanceof HTMLElement ? e.target.closest("button[data-status]") : null;
       if (!(btn instanceof HTMLButtonElement)) return;
-      if (btn.disabled || btn.getAttribute("aria-disabled") === "true") return;
+      if (btn.getAttribute("aria-disabled") === "true") {
+        showStatusBlockHint(btn, "변경불가◀️예상산출물 미완료상태");
+        return;
+      }
+      hideStatusBlockHint();
       const st = btn.dataset.status || "ready";
       if (editingId) {
         const i = tasks.findIndex((x) => x.id === editingId);
@@ -4580,6 +4665,7 @@
   });
 
   window.addEventListener("resize", () => {
+    hideStatusBlockHint();
     requestAnimationFrame(renderMultiDayRangeLines);
   });
 
@@ -4598,7 +4684,7 @@
     if (location.protocol !== "http:" && location.protocol !== "https:") return;
     window.addEventListener("load", () => {
       navigator.serviceWorker
-        .register("sw.js?v=31")
+        .register("sw.js?v=32")
         .then((reg) => {
           reg.update().catch(() => {});
           if (reg.waiting) reg.waiting.postMessage({ type: "SKIP_WAITING" });
@@ -4608,8 +4694,8 @@
         });
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         // new SW took control — reload once so calendar layout code is fresh
-        if (sessionStorage.getItem("sw-reloaded-v31")) return;
-        sessionStorage.setItem("sw-reloaded-v31", "1");
+        if (sessionStorage.getItem("sw-reloaded-v32")) return;
+        sessionStorage.setItem("sw-reloaded-v32", "1");
         location.reload();
       });
     });
