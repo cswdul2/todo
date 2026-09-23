@@ -922,18 +922,20 @@ body.calendar-dragging {
 }
 
 .calendar-cell__dot-wrap--high {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
+  /* clip-path 별의 오목한 여백을 보정해 삼각/원과 비슷한 시각 간격 */
+  margin-inline: -3px;
 }
 
 .calendar-cell__dot-wrap--medium {
-  width: 10px;
-  height: 10px;
+  width: 7px;
+  height: 7px;
 }
 
 .calendar-cell__dot-wrap--low {
-  width: 8px;
-  height: 8px;
+  width: 4px;
+  height: 4px;
 }
 
 /* 달력 점: 모양=중요도, 채움색=진행상태 */
@@ -3766,18 +3768,19 @@ body.calendar-dragging {
   }
 
   .calendar-cell__dot-wrap--high {
-    width: 17px;
-    height: 17px;
+    width: 15px;
+    height: 15px;
+    margin-inline: -2px;
   }
 
   .calendar-cell__dot-wrap--medium {
-    width: 8px;
-    height: 8px;
+    width: 5px;
+    height: 5px;
   }
 
   .calendar-cell__dot-wrap--low {
-    width: 7px;
-    height: 7px;
+    width: 3px;
+    height: 3px;
   }
 
   .calendar-cell__dot-mark--star {
