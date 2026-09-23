@@ -1432,11 +1432,17 @@
     return "반복 없음";
   }
 
-  /** 달력: 바깥 링 = 중요도(크기), 안쪽 점 = 진행 상태 색 */
+  /** 달력: 모양 = 중요도(별/삼각/원), 채움색 = 진행 상태(기한초과=빨강) */
   function importanceWrapClass(imp) {
     if (imp === "high") return "calendar-cell__dot-wrap calendar-cell__dot-wrap--high";
     if (imp === "low") return "calendar-cell__dot-wrap calendar-cell__dot-wrap--low";
     return "calendar-cell__dot-wrap calendar-cell__dot-wrap--medium";
+  }
+
+  function importanceShapeClass(imp) {
+    if (imp === "high") return "calendar-cell__dot-mark--star";
+    if (imp === "low") return "calendar-cell__dot-mark--circle";
+    return "calendar-cell__dot-mark--triangle";
   }
 
   function statusDotClass(status) {
@@ -2982,8 +2988,12 @@
           openFromDot();
         });
         const inner = document.createElement("span");
-        inner.className = "calendar-cell__dot-inner " + statusDotClass(t.status);
-        if (isTaskOverdueOnDate(t, dateStr)) inner.classList.add("calendar-cell__dot-inner--late");
+        const overdue = isTaskOverdueOnDate(t, dateStr);
+        inner.className = [
+          "calendar-cell__dot-mark",
+          importanceShapeClass(t.importance || "medium"),
+          overdue ? "calendar-cell__dot--overdue" : statusDotClass(t.status),
+        ].join(" ");
         wrap.appendChild(inner);
         dots.appendChild(wrap);
       });
@@ -4870,7 +4880,7 @@
     if (location.protocol !== "http:" && location.protocol !== "https:") return;
     window.addEventListener("load", () => {
       navigator.serviceWorker
-        .register("sw.js?v=45")
+        .register("sw.js?v=46")
         .then((reg) => {
           reg.update().catch(() => {});
           if (reg.waiting) reg.waiting.postMessage({ type: "SKIP_WAITING" });
@@ -4880,8 +4890,8 @@
         });
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         // new SW took control — reload once so calendar layout code is fresh
-        if (sessionStorage.getItem("sw-reloaded-v45")) return;
-        sessionStorage.setItem("sw-reloaded-v45", "1");
+        if (sessionStorage.getItem("sw-reloaded-v46")) return;
+        sessionStorage.setItem("sw-reloaded-v46", "1");
         location.reload();
       });
     });

@@ -6,15 +6,15 @@
   <title>일정 관리 — 월 달력</title>
   <meta name="description" content="월 달력으로 할일을 관리하고 사진에서 일정을 인식해 등록하는 앱" />
   <meta name="theme-color" content="#4a7fd4" />
-  <link rel="manifest" href="manifest.webmanifest?v=45" />
-  <link rel="icon" href="app-icon.svg?v=45" type="image/svg+xml" />
-  <link rel="icon" href="icon-192.png?v=45" type="image/png" sizes="192x192" />
-  <link rel="apple-touch-icon" href="apple-touch-icon.png?v=45" sizes="180x180" />
+  <link rel="manifest" href="manifest.webmanifest?v=46" />
+  <link rel="icon" href="app-icon.svg?v=46" type="image/svg+xml" />
+  <link rel="icon" href="icon-192.png?v=46" type="image/png" sizes="192x192" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png?v=46" sizes="180x180" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="일정 관리" />
-  <link rel="stylesheet" href="styles.css?v=45" />
+  <link rel="stylesheet" href="styles.css?v=46" />
 </head>
 <body>
   <div class="app">
@@ -79,11 +79,11 @@
             <span class="dot-legend__item"><span class="calendar-cell__dot calendar-cell__dot--done"></span> done</span>
             <span class="dot-legend__item"><span class="calendar-cell__dot calendar-cell__dot--overdue-legend"></span> 기한 초과(미완료)</span>
           </div>
-          <p class="dot-legend__heading">중요도 (크기만 다름 · 채움 없음)</p>
+          <p class="dot-legend__heading">중요도 (모양)</p>
           <div class="dot-legend__row">
-            <span class="dot-legend__item"><span class="imp-ring imp-ring--high" aria-hidden="true"></span> 상</span>
-            <span class="dot-legend__item"><span class="imp-ring imp-ring--medium" aria-hidden="true"></span> 중</span>
-            <span class="dot-legend__item"><span class="imp-ring imp-ring--low" aria-hidden="true"></span> 하</span>
+            <span class="dot-legend__item"><span class="imp-shape imp-shape--high" aria-hidden="true"></span> 상 · 별</span>
+            <span class="dot-legend__item"><span class="imp-shape imp-shape--medium" aria-hidden="true"></span> 중 · 삼각</span>
+            <span class="dot-legend__item"><span class="imp-shape imp-shape--low" aria-hidden="true"></span> 하 · 원</span>
           </div>
           <p class="dot-legend__heading dot-legend__heading--tip" tabindex="0">
             당일 업무강도
@@ -116,7 +116,7 @@
       <div class="modal__topbar">
         <div class="modal__topbar-text">
           <h2 class="modal__title" id="modalTitle">
-            <img class="modal__title-icon" src="app-icon.svg?v=45" alt="" width="28" height="28" decoding="async" />
+            <img class="modal__title-icon" src="app-icon.svg?v=46" alt="" width="28" height="28" decoding="async" />
             <span class="modal__title-date" id="modalTodayDisplay" aria-live="polite"></span>
           </h2>
           <p class="modal__hint" id="modalDateHint"></p>
@@ -305,6 +305,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
-  <script src="app.js?v=45"></script>
+  <script src="app.js?v=46"></script>
 </body>
 </html>
