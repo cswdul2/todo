@@ -2088,23 +2088,25 @@ body.calendar-dragging {
 .modal__quick-effort-label {
   display: flex;
   flex-direction: column;
-  align-items: stretch;
+  align-items: center;
   justify-content: center;
   gap: 0.1rem;
-  width: 100%;
+  width: max-content;
+  max-width: 100%;
   min-width: 0;
   box-sizing: border-box;
   text-align: center;
+  justify-self: start;
 }
 
 .modal__quick-effort-label .modal__quick-meta-label {
   height: auto;
   min-height: 0;
-  width: 100%;
-  display: flex;
+  width: auto;
+  display: inline-flex;
   align-items: center;
-  justify-content: flex-start;
-  text-align: left;
+  justify-content: center;
+  text-align: center;
   white-space: nowrap;
 }
 
@@ -2129,7 +2131,7 @@ body.calendar-dragging {
 
 .modal__quick-line--effort > .modal__quick-effort-label {
   align-self: center;
-  justify-self: stretch;
+  justify-self: start;
 }
 
 .modal__quick-line--actual {
@@ -2368,11 +2370,15 @@ body.calendar-dragging {
 
 .modal__quick-meta .modal__quick-line--effort > .modal__quick-effort-label {
   align-self: center;
+  justify-self: start;
+  width: max-content;
 }
 
 .modal__quick-meta .modal__quick-line--effort .modal__quick-meta-label {
   height: auto;
   min-height: 0;
+  width: auto;
+  justify-content: center;
 }
 
 .modal__quick-meta .modal__quick-line--actual > .modal__quick-meta-label {
