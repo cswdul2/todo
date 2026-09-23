@@ -1599,6 +1599,7 @@ body.calendar-dragging {
   border: 1px solid var(--border);
 }
 
+.ocr-draft-deliverables,
 .ocr-draft-desc {
   width: 100%;
   font: inherit;
@@ -1607,6 +1608,11 @@ body.calendar-dragging {
   border: 1px solid var(--border);
   border-radius: 8px;
   resize: vertical;
+}
+
+.ocr-draft-deliverables {
+  border-color: #93c5fd;
+  background: #f8fbff;
 }
 
 .ocr-results-actions {
