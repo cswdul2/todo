@@ -143,6 +143,7 @@
   let ocrPendingBase64 = null;
   /** @type {string} */
   let ocrPendingMime = "image/jpeg";
+  const GEMINI_API_KEY_STORAGE = "calendar-app-gemini-api-key-v1";
   let geminiKeyCache = "";
   let firebaseDb = null;
   let firebaseTasksRef = null;
@@ -3303,12 +3304,28 @@
   }
 
   async function loadGeminiKey() {
-    // 완전 비저장 모드: 키도 메모리에서만 사용
+    try {
+      const saved = localStorage.getItem(GEMINI_API_KEY_STORAGE);
+      if (typeof saved === "string" && saved.trim()) {
+        geminiKeyCache = saved.trim();
+      }
+    } catch (_) {
+      /* private mode 등 */
+    }
+    if (geminiApiKeyInput instanceof HTMLInputElement) {
+      geminiApiKeyInput.value = geminiKeyCache;
+    }
     return geminiKeyCache;
   }
 
   function saveGeminiKeyToStorage(k) {
     geminiKeyCache = (k || "").trim();
+    try {
+      if (geminiKeyCache) localStorage.setItem(GEMINI_API_KEY_STORAGE, geminiKeyCache);
+      else localStorage.removeItem(GEMINI_API_KEY_STORAGE);
+    } catch (_) {
+      /* private mode 등 */
+    }
   }
 
   function parseGeminiJsonArray(raw) {
@@ -4853,7 +4870,7 @@
     if (location.protocol !== "http:" && location.protocol !== "https:") return;
     window.addEventListener("load", () => {
       navigator.serviceWorker
-        .register("sw.js?v=44")
+        .register("sw.js?v=45")
         .then((reg) => {
           reg.update().catch(() => {});
           if (reg.waiting) reg.waiting.postMessage({ type: "SKIP_WAITING" });
@@ -4863,8 +4880,8 @@
         });
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         // new SW took control — reload once so calendar layout code is fresh
-        if (sessionStorage.getItem("sw-reloaded-v44")) return;
-        sessionStorage.setItem("sw-reloaded-v44", "1");
+        if (sessionStorage.getItem("sw-reloaded-v45")) return;
+        sessionStorage.setItem("sw-reloaded-v45", "1");
         location.reload();
       });
     });
