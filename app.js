@@ -1500,8 +1500,8 @@
     if (!total) return { allowed: true, message: null };
 
     if (phase === "partial") {
-      if (st === "ready") return { allowed: false, message: "완료된 산출물이 있습니다" };
-      if (st === "done") return { allowed: false, message: "예상산출물을 아직 남았습니다" };
+      if (st === "ready") return { allowed: false, message: "이미 완료된 산출물이 있습니다" };
+      if (st === "done") return { allowed: false, message: "예상산출물이 아직 남아있습니다" };
       return { allowed: true, message: null };
     }
 
@@ -1513,7 +1513,7 @@
     }
 
     // idle: 산출물 있으나 하나도 미완료
-    if (st === "done") return { allowed: false, message: "예상산출물을 아직 남았습니다" };
+    if (st === "done") return { allowed: false, message: "예상산출물이 아직 남아있습니다" };
     return { allowed: true, message: null };
   }
 
@@ -4711,7 +4711,7 @@
     if (location.protocol !== "http:" && location.protocol !== "https:") return;
     window.addEventListener("load", () => {
       navigator.serviceWorker
-        .register("sw.js?v=41")
+        .register("sw.js?v=42")
         .then((reg) => {
           reg.update().catch(() => {});
           if (reg.waiting) reg.waiting.postMessage({ type: "SKIP_WAITING" });
@@ -4721,8 +4721,8 @@
         });
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         // new SW took control — reload once so calendar layout code is fresh
-        if (sessionStorage.getItem("sw-reloaded-v41")) return;
-        sessionStorage.setItem("sw-reloaded-v41", "1");
+        if (sessionStorage.getItem("sw-reloaded-v42")) return;
+        sessionStorage.setItem("sw-reloaded-v42", "1");
         location.reload();
       });
     });
