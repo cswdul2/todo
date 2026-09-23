@@ -827,9 +827,7 @@ body.calendar-dragging {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 1px;
-  column-gap: 1px;
-  row-gap: 2px;
+  gap: 2px;
   max-width: 100%;
   padding-top: 0;
   background: inherit;
@@ -923,19 +921,12 @@ body.calendar-dragging {
   cursor: pointer;
 }
 
-.calendar-cell__dot-wrap--high {
+/* 칸 크기는 통일 → 중심 간격이 일정 (도형 크기는 mark만 다름) */
+.calendar-cell__dot-wrap--high,
+.calendar-cell__dot-wrap--medium,
+.calendar-cell__dot-wrap--low {
   width: 12px;
   height: 12px;
-}
-
-.calendar-cell__dot-wrap--medium {
-  width: 8px;
-  height: 8px;
-}
-
-.calendar-cell__dot-wrap--low {
-  width: 6px;
-  height: 6px;
 }
 
 /* 달력 점: 모양=중요도, 채움색=진행상태 */
@@ -3764,24 +3755,14 @@ body.calendar-dragging {
   }
 
   .calendar-cell__dots {
-    gap: 1px;
-    column-gap: 1px;
-    row-gap: 2px;
+    gap: 2px;
   }
 
-  .calendar-cell__dot-wrap--high {
+  .calendar-cell__dot-wrap--high,
+  .calendar-cell__dot-wrap--medium,
+  .calendar-cell__dot-wrap--low {
     width: 11px;
     height: 11px;
-  }
-
-  .calendar-cell__dot-wrap--medium {
-    width: 7px;
-    height: 7px;
-  }
-
-  .calendar-cell__dot-wrap--low {
-    width: 5px;
-    height: 5px;
   }
 
   .calendar-cell__dot-mark--star {
