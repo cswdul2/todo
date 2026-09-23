@@ -3354,6 +3354,88 @@
     return "";
   }
 
+  function coerceOcrDeliverables(raw, fallbackImportance) {
+    /** @type {Array<{name: string, importance: 'high'|'medium'|'low'}>} */
+    const out = [];
+    const pushName = (nameRaw, importanceRaw) => {
+      const name = nameRaw != null ? String(nameRaw).trim() : "";
+      if (!name) return;
+      const importance =
+        importanceRaw === "high" || importanceRaw === "low" || importanceRaw === "medium"
+          ? importanceRaw
+          : fallbackImportance === "high" || fallbackImportance === "low"
+            ? fallbackImportance
+            : "medium";
+      if (out.some((row) => row.name === name)) return;
+      out.push({ name, importance });
+    };
+
+    const ingestList = (list) => {
+      if (!Array.isArray(list)) return;
+      list.forEach((item) => {
+        if (typeof item === "string") {
+          pushName(item);
+          return;
+        }
+        if (item && typeof item === "object") {
+          pushName(item.name != null ? item.name : item.title, item.importance);
+        }
+      });
+    };
+
+    if (!raw || typeof raw !== "object") return out;
+    ingestList(raw.deliverables);
+    ingestList(raw.expectedDeliverables);
+    ingestList(raw.outputs);
+    if (typeof raw.deliverable === "string") pushName(raw.deliverable);
+    if (typeof raw.deliverableName === "string") pushName(raw.deliverableName);
+    if (typeof raw["산출물"] === "string") pushName(raw["산출물"]);
+    if (typeof raw["예상산출물"] === "string") pushName(raw["예상산출물"]);
+    return out;
+  }
+
+  /**
+   * description에 남은 "산출물: …" 줄을 예상산출물로 옮긴다.
+   * @param {string} description
+   * @returns {{ description: string, names: string[] }}
+   */
+  function extractDeliverablesFromDescription(description) {
+    const text = description != null ? String(description) : "";
+    if (!text.trim()) return { description: "", names: /** @type {string[]} */ ([]) };
+    const names = /** @type {string[]} */ ([]);
+    const kept = [];
+    text.split(/\r?\n/).forEach((line) => {
+      const trimmed = line.trim();
+      const labeled = trimmed.match(/^(?:예상\s*)?산출물(?:명)?\s*[:：]\s*(.+)$/i);
+      if (labeled) {
+        labeled[1]
+          .split(/[,，、/;|]/)
+          .map((part) => part.trim())
+          .filter(Boolean)
+          .forEach((name) => {
+            if (!names.includes(name)) names.push(name);
+          });
+        return;
+      }
+      kept.push(line);
+    });
+    // 한 줄 전체가 "산출물 xxx" 형태(콜론 없음)인 경우도 보조 처리
+    if (!names.length && /^(?:예상\s*)?산출물(?:명)?\s+/i.test(text.trim())) {
+      const rest = text.trim().replace(/^(?:예상\s*)?산출물(?:명)?\s*[:：]?\s*/i, "").trim();
+      if (rest) {
+        rest
+          .split(/[,，、/;|]/)
+          .map((part) => part.trim())
+          .filter(Boolean)
+          .forEach((name) => {
+            if (!names.includes(name)) names.push(name);
+          });
+        return { description: "", names };
+      }
+    }
+    return { description: kept.join("\n").trim(), names };
+  }
+
   function coerceOcrItem(o, todayStr) {
     const title = o.title != null ? String(o.title).trim() : "";
     const fallbackYear = viewYear || new Date().getFullYear();
@@ -3366,7 +3448,7 @@
     const effortValue =
       Number.isFinite(rawEffort) && rawEffort > 0 ? Math.round(rawEffort * 100) / 100 : OCR_TASK_DEFAULTS.effortValue;
     const effortUnit = o.effortUnit === "MD" ? "MD" : OCR_TASK_DEFAULTS.effortUnit;
-    const description = o.description != null ? String(o.description) : "";
+    let description = o.description != null ? String(o.description) : "";
     const rawC = Number(o.confidence);
     let confidence = Number.isFinite(rawC) ? rawC : NaN;
     if (!Number.isFinite(confidence)) {
@@ -3378,6 +3460,25 @@
     if (confidence <= 1) confidence *= 100;
     confidence = Math.max(1, Math.min(99, Math.round(confidence)));
 
+    const deliverableSeeds = coerceOcrDeliverables(o, importance);
+    const extracted = extractDeliverablesFromDescription(description);
+    description = extracted.description;
+    extracted.names.forEach((name) => {
+      if (!deliverableSeeds.some((row) => row.name === name)) {
+        deliverableSeeds.push({ name, importance: importance === "high" || importance === "low" ? importance : "medium" });
+      }
+    });
+    const deliverables = normalizeDeliverables(
+      deliverableSeeds.map((row, idx) => ({
+        id: `ocr-d-${Date.now()}-${idx}`,
+        name: row.name,
+        importance: row.importance,
+        done: false,
+        completedAt: null,
+        createdAt: Date.now() + idx,
+      }))
+    );
+
     return {
       title,
       description,
@@ -3387,6 +3488,7 @@
       effortUnit,
       startDate,
       endDate,
+      deliverables,
       recurrence: /** @type {'none'} */ (OCR_TASK_DEFAULTS.recurrence),
       recurrenceUntil: null,
       confidence,
@@ -3402,7 +3504,7 @@
     const todayStr = toDateStrFromDate(new Date());
     const prompt = `이 이미지는 한글로 적힌 할일 목록(손글씨 또는 인쇄)입니다. 모든 할일을 읽어 JSON 배열만 출력하세요.
 
-스키마: 각 원소는 {"title": string, "startDate": "YYYY-MM-DD", "endDate": "YYYY-MM-DD", "status": "ready"|"on-going"|"done", "importance": "high"|"medium"|"low", "effortValue": number, "effortUnit": "MH"|"MD", "description": string, "confidence": number}
+스키마: 각 원소는 {"title": string, "startDate": "YYYY-MM-DD", "endDate": "YYYY-MM-DD", "status": "ready"|"on-going"|"done", "importance": "high"|"medium"|"low", "effortValue": number, "effortUnit": "MH"|"MD", "description": string, "deliverables": [{"name": string, "importance": "high"|"medium"|"low"}], "confidence": number}
 규칙:
 - 날짜가 적혀 있으면 그 날짜를 사용합니다. 같은 날짜 아래에 여러 줄이 있으면 각각 별도 항목으로 두고 같은 startDate와 endDate를 씁니다.
 - 연도가 없는 날짜(예: 5/4, 5월 4일)는 현재 달력 화면의 연도(${viewYear})를 붙여 YYYY-MM-DD로 만듭니다.
@@ -3411,7 +3513,9 @@
 - status는 판별 가능할 때 채우고, 애매하면 "ready"로 둡니다.
 - importance는 판별 가능할 때만 채우고, 애매하면 "medium"으로 둡니다.
 - effortValue/effortUnit은 적혀 있을 때 채우고, 없으면 effortValue는 4, effortUnit은 "MH"로 둡니다.
-- description은 부가 메모가 있을 때만 채우고 없으면 빈 문자열.
+- "산출물", "예상산출물", "산출물명" 라벨 뒤의 값(예: "산출물: 테스트결과지")은 반드시 deliverables 배열에 넣고 description에는 넣지 마세요.
+- 산출물이 여러 개면 deliverables에 원소를 여러 개로 나눕니다. importance가 따로 없으면 할일 importance를 따릅니다.
+- description은 산출물이 아닌 부가 메모가 있을 때만 채우고 없으면 빈 문자열.
 - confidence는 해당 항목 인식 신뢰도(0~1 또는 0~100 숫자)로 넣습니다.
 - JSON 배열만 출력하고 다른 설명은 쓰지 마세요.`;
 
@@ -3539,6 +3643,7 @@
               </select>
             </label>
           </div>
+          <textarea class="ocr-draft-deliverables" rows="2" data-index="${index}" placeholder="예상산출물 (줄마다 하나)"></textarea>
           <textarea class="ocr-draft-desc" rows="2" data-index="${index}" placeholder="설명(선택)"></textarea>
         </div>`;
       ocrDraftList.appendChild(li);
@@ -3549,6 +3654,7 @@
       const imEl = li.querySelector(".ocr-draft-imp");
       const efEl = li.querySelector(".ocr-draft-effort");
       const euEl = li.querySelector(".ocr-draft-effort-unit");
+      const delEl = li.querySelector(".ocr-draft-deliverables");
       const dEl = li.querySelector(".ocr-draft-desc");
       if (titleEl) titleEl.value = row.title || "";
       if (sEl) sEl.value = row.startDate || "";
@@ -3560,6 +3666,12 @@
           row.effortValue != null && Number(row.effortValue) > 0 ? String(row.effortValue) : String(OCR_TASK_DEFAULTS.effortValue);
       }
       if (euEl) euEl.value = row.effortUnit === "MD" ? "MD" : OCR_TASK_DEFAULTS.effortUnit;
+      if (delEl) {
+        const names = Array.isArray(row.deliverables)
+          ? row.deliverables.map((d) => (d && d.name != null ? String(d.name).trim() : "")).filter(Boolean)
+          : [];
+        delEl.value = names.join("\n");
+      }
       if (dEl) dEl.value = row.description || "";
     });
   }
@@ -3574,6 +3686,7 @@
       const im = /** @type {HTMLSelectElement | null} */ (ocrDraftList.querySelector(`.ocr-draft-imp[data-index="${index}"]`));
       const ef = /** @type {HTMLInputElement | null} */ (ocrDraftList.querySelector(`.ocr-draft-effort[data-index="${index}"]`));
       const eu = /** @type {HTMLSelectElement | null} */ (ocrDraftList.querySelector(`.ocr-draft-effort-unit[data-index="${index}"]`));
+      const del = /** @type {HTMLTextAreaElement | null} */ (ocrDraftList.querySelector(`.ocr-draft-deliverables[data-index="${index}"]`));
       const d = /** @type {HTMLTextAreaElement | null} */ (ocrDraftList.querySelector(`.ocr-draft-desc[data-index="${index}"]`));
       const cb = /** @type {HTMLInputElement | null} */ (ocrDraftList.querySelector(`.ocr-draft-cb[data-index="${index}"]`));
       if (!cb || !cb.checked) return;
@@ -3585,13 +3698,42 @@
       const endDraft = e && e.value ? e.value : "";
       const finalStart = startDraft || endDraft || toDateStrFromDate(new Date());
       const finalEnd = endDraft || startDraft || finalStart;
+      const importance =
+        im && ["high", "medium", "low"].includes(im.value) ? /** @type {'high'|'medium'|'low'} */ (im.value) : "medium";
+      let description = d ? d.value.trim() : "";
+      const deliverableNames = [];
+      if (del && del.value.trim()) {
+        del.value
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter(Boolean)
+          .forEach((name) => {
+            if (!deliverableNames.includes(name)) deliverableNames.push(name);
+          });
+      }
+      const extracted = extractDeliverablesFromDescription(description);
+      description = extracted.description;
+      extracted.names.forEach((name) => {
+        if (!deliverableNames.includes(name)) deliverableNames.push(name);
+      });
+      const deliverables = normalizeDeliverables(
+        deliverableNames.map((name, idx) => ({
+          id: `ocr-apply-d-${Date.now()}-${index}-${idx}`,
+          name,
+          importance,
+          done: false,
+          completedAt: null,
+          createdAt: Date.now() + idx,
+        }))
+      );
       const payload = {
         title: (title && title.value.trim()) || "(제목 없음)",
         startDate: finalStart,
         endDate: finalEnd,
         status: st && ["ready", "on-going", "done"].includes(st.value) ? st.value : "ready",
-        importance: im && ["high", "medium", "low"].includes(im.value) ? /** @type {'high'|'medium'|'low'} */ (im.value) : "medium",
-        description: d ? d.value.trim() : "",
+        importance,
+        description,
+        deliverables,
         effortValue,
         effortUnit,
         recurrence: /** @type {'none'} */ ("none"),
@@ -4711,7 +4853,7 @@
     if (location.protocol !== "http:" && location.protocol !== "https:") return;
     window.addEventListener("load", () => {
       navigator.serviceWorker
-        .register("sw.js?v=42")
+        .register("sw.js?v=43")
         .then((reg) => {
           reg.update().catch(() => {});
           if (reg.waiting) reg.waiting.postMessage({ type: "SKIP_WAITING" });
@@ -4721,8 +4863,8 @@
         });
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         // new SW took control — reload once so calendar layout code is fresh
-        if (sessionStorage.getItem("sw-reloaded-v42")) return;
-        sessionStorage.setItem("sw-reloaded-v42", "1");
+        if (sessionStorage.getItem("sw-reloaded-v43")) return;
+        sessionStorage.setItem("sw-reloaded-v43", "1");
         location.reload();
       });
     });
