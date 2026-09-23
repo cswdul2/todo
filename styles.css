@@ -518,14 +518,14 @@ body.body--overlay-open {
 }
 
 .imp-shape--medium {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   clip-path: polygon(50% 4%, 4% 96%, 96% 96%);
 }
 
 .imp-shape--low {
-  width: 9px;
-  height: 9px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
 }
 
@@ -929,7 +929,7 @@ body.calendar-dragging {
   margin-inline: 0;
 }
 
-/* 달력 점: 모양=중요도, 채움색=진행상태 — 크기는 비슷하게, 모양으로 구분 */
+/* 달력 점: 모양=중요도, 채움색=진행상태 */
 .calendar-cell__dot-mark {
   display: block;
   flex-shrink: 0;
@@ -945,14 +945,14 @@ body.calendar-dragging {
 }
 
 .calendar-cell__dot-mark--triangle {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   clip-path: polygon(50% 4%, 4% 96%, 96% 96%);
 }
 
 .calendar-cell__dot-mark--circle {
-  width: 9px;
-  height: 9px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
 }
 
@@ -3772,13 +3772,13 @@ body.calendar-dragging {
   }
 
   .calendar-cell__dot-mark--triangle {
-    width: 9px;
-    height: 9px;
+    width: 7px;
+    height: 7px;
   }
 
   .calendar-cell__dot-mark--circle {
-    width: 8px;
-    height: 8px;
+    width: 5px;
+    height: 5px;
   }
 
   .task-chip__status {
