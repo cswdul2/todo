@@ -1472,14 +1472,58 @@
     return getEditingTask()?.importance || draftImportance;
   }
 
+  function getDeliverableProgress(rows) {
+    const normalized = Array.isArray(rows) ? rows : [];
+    const total = normalized.length;
+    if (!total) {
+      return { total: 0, doneCount: 0, anyDone: false, allDone: false, phase: /** @type {const} */ ("none") };
+    }
+    const doneCount = normalized.filter((row) => isDeliverableComplete(row)).length;
+    const anyDone = doneCount > 0;
+    const allDone = doneCount === total;
+    /** @type {'none'|'idle'|'partial'|'complete'} */
+    let phase = "idle";
+    if (allDone) phase = "complete";
+    else if (anyDone) phase = "partial";
+    return { total, doneCount, anyDone, allDone, phase };
+  }
+
+  /**
+   * 산출물 진행도에 따른 상태 변경 허용 여부.
+   * @param {string} targetStatus
+   * @param {Array<{done?: boolean, completedAt?: string | null}>} rows
+   * @returns {{ allowed: boolean, message: string | null }}
+   */
+  function evaluateStatusChange(targetStatus, rows) {
+    const st = targetStatus === "on-going" || targetStatus === "done" ? targetStatus : "ready";
+    const { total, phase } = getDeliverableProgress(rows);
+    if (!total) return { allowed: true, message: null };
+
+    if (phase === "partial") {
+      if (st === "ready") return { allowed: false, message: "완료된 산출물이 있습니다" };
+      if (st === "done") return { allowed: false, message: "예상산출물을 아직 남았습니다" };
+      return { allowed: true, message: null };
+    }
+
+    if (phase === "complete") {
+      if (st === "ready" || st === "on-going") {
+        return { allowed: false, message: "모든 산출물을 완수했습니다" };
+      }
+      return { allowed: true, message: null };
+    }
+
+    // idle: 산출물 있으나 하나도 미완료
+    if (st === "done") return { allowed: false, message: "예상산출물을 아직 남았습니다" };
+    return { allowed: true, message: null };
+  }
+
   function deriveStatusFromDeliverables(currentStatus, rows) {
-    const normalizedRows = Array.isArray(rows) ? rows : [];
-    if (!normalizedRows.length) return currentStatus;
-    const anyDone = normalizedRows.some((row) => isDeliverableComplete(row));
-    const allDone = anyDone && normalizedRows.every((row) => isDeliverableComplete(row));
-    if (allDone) return "done";
-    if (currentStatus === "done") return "on-going";
-    if (anyDone && currentStatus === "ready") return "on-going";
+    const { total, phase } = getDeliverableProgress(rows);
+    if (!total) return currentStatus;
+    if (phase === "complete") return "done";
+    if (phase === "partial") return "on-going";
+    // idle: 완료된 산출물 없음 — done이면 ready로 되돌림
+    if (currentStatus === "done") return "ready";
     return currentStatus;
   }
 
@@ -1533,90 +1577,58 @@
   }
 
   function canSetDoneStatusFromModal() {
-    if (!deliverableList) return true;
-    const dates = deliverableList.querySelectorAll(".deliverable-item__completed-at");
-    if (!dates.length) return true;
-    return Array.from(dates).every((el) => el instanceof HTMLInputElement && !!normalizeCompletedAtDate(el.value));
+    return evaluateStatusChange("done", collectDeliverablesFromModal()).allowed;
   }
 
   function canSetDoneStatusForTaskOnDate(task, dateStr) {
     if (!task) return false;
     const rows = getModalDeliverablesForDate(task, dateStr || task.startDate || null);
-    if (!rows.length) return true;
-    return rows.every((row) => isDeliverableComplete(row));
+    return evaluateStatusChange("done", rows).allowed;
+  }
+
+  function getModalStatusBlockMessage(targetStatus) {
+    return evaluateStatusChange(targetStatus, collectDeliverablesFromModal()).message;
+  }
+
+  function getTaskStatusBlockMessage(task, dateStr, targetStatus) {
+    if (!task) return null;
+    const rows = getModalDeliverablesForDate(task, dateStr || task.startDate || null);
+    return evaluateStatusChange(targetStatus, rows).message;
+  }
+
+  async function applyDerivedStatusFromModalDeliverables() {
+    const rows = collectDeliverablesFromModal();
+    const current = getCurrentStatus();
+    const next = deriveStatusFromDeliverables(current, rows);
+    if (next === current) return;
+
+    if (editingId) {
+      const i = tasks.findIndex((x) => x.id === editingId);
+      if (i >= 0) {
+        tasks[i] = { ...tasks[i], status: next };
+        await firebaseUpdateTask(editingId, { status: next });
+      }
+    } else {
+      draftStatus = next;
+    }
+
+    modalDefaultWhite = false;
+    renderQuickMetaControls();
+    applyModalTheme();
+    renderCalendar();
+    if (!existingTasksWrap.hidden) renderExistingTasksList();
   }
 
   async function enforceDoneStatusConstraint() {
-    if (canSetDoneStatusFromModal()) return;
-    const current = getCurrentStatus();
-    if (current !== "done") return;
-
-    if (editingId) {
-      const i = tasks.findIndex((x) => x.id === editingId);
-      if (i >= 0) {
-        tasks[i] = { ...tasks[i], status: "on-going" };
-        await firebaseUpdateTask(editingId, { status: "on-going" });
-      }
-    } else {
-      draftStatus = "on-going";
-    }
-
-    modalDefaultWhite = false;
-    renderQuickMetaControls();
-    applyModalTheme();
-    renderCalendar();
-    if (!existingTasksWrap.hidden) renderExistingTasksList();
+    await applyDerivedStatusFromModalDeliverables();
   }
 
   async function autoPromoteDoneStatusWhenEligible() {
-    const rows = collectDeliverablesFromModal();
-    if (!rows.length) return;
-    if (!rows.every((row) => isDeliverableComplete(row))) return;
-    const current = getCurrentStatus();
-    if (current === "done") return;
-
-    if (editingId) {
-      const i = tasks.findIndex((x) => x.id === editingId);
-      if (i >= 0) {
-        tasks[i] = { ...tasks[i], status: "done" };
-        await firebaseUpdateTask(editingId, { status: "done" });
-      }
-    } else {
-      draftStatus = "done";
-    }
-
-    modalDefaultWhite = false;
-    renderQuickMetaControls();
-    applyModalTheme();
-    renderCalendar();
-    if (!existingTasksWrap.hidden) renderExistingTasksList();
+    await applyDerivedStatusFromModalDeliverables();
   }
 
   async function autoPromoteOngoingWhenStarted() {
-    const rows = collectDeliverablesFromModal();
-    if (!rows.length) return;
-    const anyDone = rows.some((row) => isDeliverableComplete(row));
-    if (!anyDone) return;
-    const allDone = rows.every((row) => isDeliverableComplete(row));
-    if (allDone) return;
-    const current = getCurrentStatus();
-    if (current !== "ready") return;
-
-    if (editingId) {
-      const i = tasks.findIndex((x) => x.id === editingId);
-      if (i >= 0) {
-        tasks[i] = { ...tasks[i], status: "on-going" };
-        await firebaseUpdateTask(editingId, { status: "on-going" });
-      }
-    } else {
-      draftStatus = "on-going";
-    }
-
-    modalDefaultWhite = false;
-    renderQuickMetaControls();
-    applyModalTheme();
-    renderCalendar();
-    if (!existingTasksWrap.hidden) renderExistingTasksList();
+    await applyDerivedStatusFromModalDeliverables();
   }
 
   function renderQuickMetaControls() {
@@ -1624,14 +1636,14 @@
     const imp = getCurrentImportance();
     if (quickStatusGroup) {
       const buttons = quickStatusGroup.querySelectorAll("button[data-status]");
-      const canDone = canSetDoneStatusFromModal();
+      const rows = collectDeliverablesFromModal();
       buttons.forEach((btn) => {
-        const isDoneBtn = btn.getAttribute("data-status") === "done";
-        const disabledDone = isDoneBtn && !canDone;
-        const active = !disabledDone && btn.getAttribute("data-status") === status;
+        const st = btn.getAttribute("data-status") || "ready";
+        const blocked = !evaluateStatusChange(st, rows).allowed;
+        const active = !blocked && st === status;
         btn.disabled = false;
-        btn.setAttribute("aria-disabled", disabledDone ? "true" : "false");
-        btn.classList.toggle("modal__quick-btn--disabled-done", disabledDone);
+        btn.setAttribute("aria-disabled", blocked ? "true" : "false");
+        btn.classList.toggle("modal__quick-btn--disabled-done", blocked);
         btn.classList.toggle("modal__quick-btn--active", active);
         btn.setAttribute("aria-checked", active ? "true" : "false");
       });
@@ -3150,8 +3162,9 @@
           e.stopPropagation();
           const i = tasks.findIndex((x) => x.id === t.id);
           if (i < 0) return;
-          if (st === "done" && !canSetDoneStatusForTaskOnDate(tasks[i], selectedDateStr)) {
-            showStatusBlockHint(q, "변경불가◀️예상산출물 미완료상태");
+          const blockMsg = getTaskStatusBlockMessage(tasks[i], selectedDateStr, st);
+          if (blockMsg) {
+            showStatusBlockHint(q, blockMsg);
             return;
           }
           hideStatusBlockHint();
@@ -4355,12 +4368,13 @@
     quickStatusGroup.addEventListener("click", async (e) => {
       const btn = e.target instanceof HTMLElement ? e.target.closest("button[data-status]") : null;
       if (!(btn instanceof HTMLButtonElement)) return;
-      if (btn.getAttribute("aria-disabled") === "true") {
-        showStatusBlockHint(btn, "변경불가◀️예상산출물 미완료상태");
+      const st = btn.dataset.status || "ready";
+      const blockMsg = getModalStatusBlockMessage(st);
+      if (blockMsg) {
+        showStatusBlockHint(btn, blockMsg);
         return;
       }
       hideStatusBlockHint();
-      const st = btn.dataset.status || "ready";
       if (editingId) {
         const i = tasks.findIndex((x) => x.id === editingId);
         if (i >= 0) {
@@ -4697,7 +4711,7 @@
     if (location.protocol !== "http:" && location.protocol !== "https:") return;
     window.addEventListener("load", () => {
       navigator.serviceWorker
-        .register("sw.js?v=39")
+        .register("sw.js?v=40")
         .then((reg) => {
           reg.update().catch(() => {});
           if (reg.waiting) reg.waiting.postMessage({ type: "SKIP_WAITING" });
@@ -4707,8 +4721,8 @@
         });
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         // new SW took control — reload once so calendar layout code is fresh
-        if (sessionStorage.getItem("sw-reloaded-v39")) return;
-        sessionStorage.setItem("sw-reloaded-v39", "1");
+        if (sessionStorage.getItem("sw-reloaded-v40")) return;
+        sessionStorage.setItem("sw-reloaded-v40", "1");
         location.reload();
       });
     });

@@ -2267,8 +2267,8 @@ body.calendar-dragging {
     0 2px 0 rgba(255, 255, 255, 0.75) inset;
 }
 
-.modal__quick-btn[data-status="done"].modal__quick-btn--disabled-done,
-.modal__quick-btn[data-status="done"]:disabled {
+.modal__quick-btn.modal__quick-btn--disabled-done,
+.modal__quick-btn:disabled {
   color: #6b7280;
   border-color: #9ca3af;
   background-color: #e5e7eb;
@@ -2285,10 +2285,11 @@ body.calendar-dragging {
   filter: grayscale(0.12);
 }
 
-.modal__quick-btn[data-status="done"].modal__quick-btn--disabled-done:hover,
-.modal__quick-btn[data-status="done"]:disabled:hover {
+.modal__quick-btn.modal__quick-btn--disabled-done:hover,
+.modal__quick-btn:disabled:hover {
   border-color: #9ca3af;
   background-color: #e5e7eb;
+  transform: none;
 }
 
 .status-block-hint {
