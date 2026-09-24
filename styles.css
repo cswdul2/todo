@@ -558,10 +558,12 @@ body.body--overlay-open {
   transition: transform 120ms ease, box-shadow 140ms ease, opacity 120ms ease;
 }
 
-/* 기한 지난 미완료 Task 바: 적색 점선 외곽선으로 강조 */
+/* 기한 지난 미완료 Task 바: 적색 점선 외곽선으로 강조.
+   box-sizing:border-box 로 테두리를 바 안쪽에 그려 날짜 경계선을 넘지 않도록 함. */
 .calendar-range-line--overdue {
-  outline: 2px dashed #dc2626;
-  outline-offset: 1px;
+  box-sizing: border-box;
+  border: 2px dashed #dc2626;
+  outline: none;
 }
 
 .calendar-cell__dot-wrap,
