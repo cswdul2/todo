@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Icon Proposals v2</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; background: #0f172a; color: #e2e8f0; }
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 24px 20px 60px; }
+    h1 { font-size: 22px; margin: 0 0 4px; }
+    .sub { font-size: 13px; color: #94a3b8; margin: 0 0 24px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; }
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 18px; }
+    .label { font-size: 16px; font-weight: 800; margin: 0 0 2px; }
+    .desc { font-size: 12.5px; color: #cbd5e1; margin: 0 0 16px; line-height: 1.5; }
+    .big { width: 100%; max-width: 240px; aspect-ratio: 1; border-radius: 22%; display: block; margin: 0 auto 18px; }
+
+    .row { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+    .mock { border-radius: 20px; padding: 14px 16px 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+    .mock--dark { background: linear-gradient(160deg, #3a4a6b, #1c2740); }
+    .mock--light { background: linear-gradient(160deg, #dbe6f5, #f3f6fb); }
+    .mock .tile { width: 68px; height: 68px; border-radius: 22%; box-shadow: 0 6px 14px rgba(0,0,0,0.28); display: block; }
+    .mock .name { font-size: 11px; font-weight: 600; }
+    .mock--dark .name { color: #f1f5f9; }
+    .mock--light .name { color: #1e293b; }
+
+    .sizes { display: flex; align-items: flex-end; gap: 14px; margin-top: 16px; padding-top: 14px; border-top: 1px dashed #334155; }
+    .sizes .col { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+    .sizes img { border-radius: 22%; display: block; }
+    .sizes .cap { font-size: 10px; color: #94a3b8; }
+    .s180 { width: 60px; height: 60px; }
+    .s48 { width: 40px; height: 40px; }
+    .s32 { width: 28px; height: 28px; }
+    .s16 { width: 16px; height: 16px; }
+    .note { margin-top: 28px; font-size: 12px; color: #94a3b8; line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>웹앱 아이콘 신규 제안 3종 (E · F · G)</h1>
+    <p class="sub">앱 실제 팔레트 사용 — 브랜드 블루 #4a7fd4 / 상태 도트: ready #8b95a5, on-going #e8943a, done #43a047</p>
+
+    <div class="grid">
+      <!-- E -->
+      <div class="card">
+        <img class="big" src="./e-brand-blue.svg" alt="E brand blue" />
+        <p class="label">E안 · 브랜드 블루 캘린더</p>
+        <p class="desc">앱 테마색(#4a7fd4) 그대로. 흰 캘린더 카드 + 파란 헤더 + 체크. 밝고 신뢰감 있는 기본형.</p>
+        <div class="row">
+          <div class="mock mock--dark"><img class="tile" src="./e-brand-blue.svg" alt="" /><span class="name">일정 관리</span></div>
+          <div class="mock mock--light"><img class="tile" src="./e-brand-blue.svg" alt="" /><span class="name">일정 관리</span></div>
+        </div>
+        <div class="sizes">
+          <div class="col"><img class="s180" src="./e-brand-blue.svg" alt="" /><span class="cap">180</span></div>
+          <div class="col"><img class="s48" src="./e-brand-blue.svg" alt="" /><span class="cap">48</span></div>
+          <div class="col"><img class="s32" src="./e-brand-blue.svg" alt="" /><span class="cap">32</span></div>
+          <div class="col"><img class="s16" src="./e-brand-blue.svg" alt="" /><span class="cap">16</span></div>
+        </div>
+      </div>
+
+      <!-- F -->
+      <div class="card">
+        <img class="big" src="./f-progress-ring.svg" alt="F progress ring" />
+        <p class="label">F안 · 진행도 링</p>
+        <p class="desc">앱의 업무강도·실적MH 진행 개념을 형상화. 다크 배경 + 오렌지→그린 진행 링 + 체크. 프리미엄/포인트형.</p>
+        <div class="row">
+          <div class="mock mock--dark"><img class="tile" src="./f-progress-ring.svg" alt="" /><span class="name">일정 관리</span></div>
+          <div class="mock mock--light"><img class="tile" src="./f-progress-ring.svg" alt="" /><span class="name">일정 관리</span></div>
+        </div>
+        <div class="sizes">
+          <div class="col"><img class="s180" src="./f-progress-ring.svg" alt="" /><span class="cap">180</span></div>
+          <div class="col"><img class="s48" src="./f-progress-ring.svg" alt="" /><span class="cap">48</span></div>
+          <div class="col"><img class="s32" src="./f-progress-ring.svg" alt="" /><span class="cap">32</span></div>
+          <div class="col"><img class="s16" src="./f-progress-ring.svg" alt="" /><span class="cap">16</span></div>
+        </div>
+      </div>
+
+      <!-- G -->
+      <div class="card">
+        <img class="big" src="./g-status-dots.svg" alt="G status dots" />
+        <p class="label">G안 · 상태 도트 캘린더</p>
+        <p class="desc">앱 범례의 상태 3색(ready·on-going·done)을 그대로 반영. 라이트 배경 + 파란 라인 캘린더 + 3색 도트. 정보형/친근형.</p>
+        <div class="row">
+          <div class="mock mock--dark"><img class="tile" src="./g-status-dots.svg" alt="" /><span class="name">일정 관리</span></div>
+          <div class="mock mock--light"><img class="tile" src="./g-status-dots.svg" alt="" /><span class="name">일정 관리</span></div>
+        </div>
+        <div class="sizes">
+          <div class="col"><img class="s180" src="./g-status-dots.svg" alt="" /><span class="cap">180</span></div>
+          <div class="col"><img class="s48" src="./g-status-dots.svg" alt="" /><span class="cap">48</span></div>
+          <div class="col"><img class="s32" src="./g-status-dots.svg" alt="" /><span class="cap">32</span></div>
+          <div class="col"><img class="s16" src="./g-status-dots.svg" alt="" /><span class="cap">16</span></div>
+        </div>
+      </div>
+    </div>
+
+    <p class="note">
+      각 카드: 큰 미리보기(둥근 모서리 = iOS 홈 화면 마스크) · 다크/라이트 홈 화면 배경 목업 · 실제 파비콘/아이콘 크기(180·48·32·16px).<br />
+      마음에 드는 안을 고르시면 실제 아이콘 파일(app-icon.svg, icon-192/512, apple-touch-icon 등)로 교체·생성해 드립니다.
+    </p>
+  </div>
+</body>
+</html>
