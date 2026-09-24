@@ -558,6 +558,12 @@ body.body--overlay-open {
   transition: transform 120ms ease, box-shadow 140ms ease, opacity 120ms ease;
 }
 
+/* 기한 지난 미완료 Task 바: 적색 점선 외곽선으로 강조 */
+.calendar-range-line--overdue {
+  outline: 2px dashed #dc2626;
+  outline-offset: 1px;
+}
+
 .calendar-cell__dot-wrap,
 .calendar-cell__task-bar {
   z-index: 10;

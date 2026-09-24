@@ -2279,6 +2279,9 @@
         const line = document.createElement("div");
         line.className = "calendar-range-line";
         line.style.background = rangeLineColorForTask(item.task, item.endStr);
+        if (isOverdueOccurrence(item.endStr, item.task.status)) {
+          line.classList.add("calendar-range-line--overdue");
+        }
         line.style.left = Math.round(firstCell.offsetLeft) + "px";
         line.style.top = lineTop + "px";
         line.style.width = Math.round(lastCell.offsetLeft + lastCell.offsetWidth - firstCell.offsetLeft) + "px";
@@ -2297,6 +2300,9 @@
       const line = document.createElement("div");
       line.className = "calendar-range-line";
       line.style.background = statusBarColor(item.task.status);
+      if (isOverdueOccurrence(ds, item.task.status)) {
+        line.classList.add("calendar-range-line--overdue");
+      }
       line.style.left = Math.round(cell.offsetLeft) + "px";
       line.style.top = lineTop + "px";
       line.style.width = Math.round(cell.offsetWidth) + "px";
@@ -4880,7 +4886,7 @@
     if (location.protocol !== "http:" && location.protocol !== "https:") return;
     window.addEventListener("load", () => {
       navigator.serviceWorker
-        .register("sw.js?v=54")
+        .register("sw.js?v=55")
         .then((reg) => {
           reg.update().catch(() => {});
           if (reg.waiting) reg.waiting.postMessage({ type: "SKIP_WAITING" });
@@ -4890,8 +4896,8 @@
         });
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         // new SW took control — reload once so calendar layout code is fresh
-        if (sessionStorage.getItem("sw-reloaded-v54")) return;
-        sessionStorage.setItem("sw-reloaded-v54", "1");
+        if (sessionStorage.getItem("sw-reloaded-v55")) return;
+        sessionStorage.setItem("sw-reloaded-v55", "1");
         location.reload();
       });
     });

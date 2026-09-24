@@ -4,7 +4,7 @@
   "description": "월 달력으로 할일을 관리하고 사진에서 일정을 인식해 등록하는 앱",
   "lang": "ko",
   "dir": "ltr",
-  "start_url": "./index.html?v=54",
+  "start_url": "./index.html?v=55",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
@@ -12,25 +12,25 @@
   "theme_color": "#4a7fd4",
   "icons": [
     {
-      "src": "icon-192.png?v=54",
+      "src": "icon-192.png?v=55",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "icon-512.png?v=54",
+      "src": "icon-512.png?v=55",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "icon-maskable-512.png?v=54",
+      "src": "icon-maskable-512.png?v=55",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
     },
     {
-      "src": "app-icon.svg?v=54",
+      "src": "app-icon.svg?v=55",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
