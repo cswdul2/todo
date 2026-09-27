@@ -1458,12 +1458,6 @@
     }
   }
 
-  function statusBarColor(status) {
-    if (status === "on-going") return "#e8943a";
-    if (status === "done") return "#43a047";
-    return "#8b95a5";
-  }
-
   const MODAL_THEME_CLASSES = ["modal__inner--default", "modal__inner--ready", "modal__inner--ongoing", "modal__inner--done"];
 
   function getEditingTask() {
@@ -2279,9 +2273,6 @@
         const line = document.createElement("div");
         line.className = "calendar-range-line";
         line.style.background = rangeLineColorForTask(item.task, item.endStr);
-        if (isOverdueOccurrence(item.endStr, item.task.status)) {
-          line.classList.add("calendar-range-line--overdue");
-        }
         line.style.left = Math.round(firstCell.offsetLeft) + "px";
         line.style.top = lineTop + "px";
         line.style.width = Math.round(lastCell.offsetLeft + lastCell.offsetWidth - firstCell.offsetLeft) + "px";
@@ -2299,10 +2290,7 @@
       const lineTop = Math.round(cell.offsetTop + rowBase + item.lane * LINE_STEP);
       const line = document.createElement("div");
       line.className = "calendar-range-line";
-      line.style.background = statusBarColor(item.task.status);
-      if (isOverdueOccurrence(ds, item.task.status)) {
-        line.classList.add("calendar-range-line--overdue");
-      }
+      line.style.background = rangeLineColorForTask(item.task, ds);
       line.style.left = Math.round(cell.offsetLeft) + "px";
       line.style.top = lineTop + "px";
       line.style.width = Math.round(cell.offsetWidth) + "px";
@@ -4886,7 +4874,7 @@
     if (location.protocol !== "http:" && location.protocol !== "https:") return;
     window.addEventListener("load", () => {
       navigator.serviceWorker
-        .register("sw.js?v=56")
+        .register("sw.js?v=57")
         .then((reg) => {
           reg.update().catch(() => {});
           if (reg.waiting) reg.waiting.postMessage({ type: "SKIP_WAITING" });
@@ -4896,8 +4884,8 @@
         });
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         // new SW took control — reload once so calendar layout code is fresh
-        if (sessionStorage.getItem("sw-reloaded-v56")) return;
-        sessionStorage.setItem("sw-reloaded-v56", "1");
+        if (sessionStorage.getItem("sw-reloaded-v57")) return;
+        sessionStorage.setItem("sw-reloaded-v57", "1");
         location.reload();
       });
     });
